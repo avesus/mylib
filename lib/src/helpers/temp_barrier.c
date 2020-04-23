@@ -10,17 +10,12 @@ typedef struct core_enforcer_args {
     int32_t             core_num;
 } core_enforcer_args;
 
-
-// stores data. This will be removed soon
+// stores temperature data after a given test
+// tmp_barrier  : temp barrier to store data in
+// temp_line    : most recent set of temperature reads
 #ifdef STORE_DATA
 static void
-storeData(temp_barrier * tmp_barrier,  // tmp_barrier we are
-                                       // storing data for
-
-          float * temp_line  // data from most
-          // recent temperature
-          // check
-) {
+storeData(temp_barrier * tmp_barrier, float * temp_line) {
 
     int32_t  cur_trial       = tmp_barrier->cur_trial;
     int32_t  usec_sleep_time = tmp_barrier->usec_sleep_time;
@@ -59,7 +54,6 @@ storeData(temp_barrier * tmp_barrier,  // tmp_barrier we are
 
         tmp_barrier->trial_bound = new_trial_bound;
     }
-
 
     int32_t len   = tmp_barrier->bounds[cur_trial];
     int32_t index = tmp_barrier->index[cur_trial];
@@ -108,13 +102,11 @@ getSetCore(cpu_set_t * check_cores) {
     return ret;
 }
 
-
 // returns next cpu in the set after n
+// cpus    : cpuset of current active cpus
+// n       : last cpu that was returned.
 static uint32_t
-getNextCPU(cpu_set_t * cpus,  // cpu set
-           int32_t     n      // index to find next
-           // cpu from
-) {
+getNextCPU(cpu_set_t * cpus, int32_t n) {
 
     n++;
     // basically a cpu_set_t is a just a 1024 bit bitvector. This bitcount
@@ -144,10 +136,16 @@ getNextCPU(cpu_set_t * cpus,  // cpu set
 }
 
 #define IS_IN_RANGE 0
+
 // Returns IS_IN_RANGE if temp is within temp range. If not returns
 // current temp - init_temp as integether (rounds up to 1 as temps are
 // floats and return is int). Can check positive/negative to see if to
 // hot/cold if return is not in range
+// init_temp         : initial temperature for the core
+// allowed_variance  : how close current temperature and init temp need to be
+// cur_temp          : variable to store current temperature in.
+// fd                : file descriptor with opened temperature file
+// fd_lock           : lock to avoid race condition on reading from file
 static int32_t
 inRange(float             init_temp,
         float             allowed_variance,
@@ -158,8 +156,12 @@ inRange(float             init_temp,
     pthread_mutex_lock(fd_lock);
     *cur_temp = getTemp(fd);
     pthread_mutex_unlock(fd_lock);
-    if (*cur_temp >= init_temp) {                          // temp above init
-        if (*cur_temp < (init_temp * allowed_variance)) {  // within threshold
+
+    // temp above init
+    if (*cur_temp >= init_temp) {
+
+        // within threshold
+        if (*cur_temp < (init_temp * allowed_variance)) {
             return IS_IN_RANGE;
         }
         uint32_t ret = *cur_temp - init_temp;
@@ -175,7 +177,11 @@ inRange(float             init_temp,
     }
 }
 
-
+// Will try and get the temperature of each core being tracked within range of
+// its initial value. For some cores this might mean raising its temperature
+// (done via spinning). For others this might mean lowering the temperature
+// (done via sleeping). This will be called by a seperate thread for each core.
+// targs    : void * cast of core_enforce_args struct.
 static void *
 perCoreEnforcer(void * targs) {
     core_enforcer_args * args             = (core_enforcer_args *)targs;
@@ -208,6 +214,12 @@ perCoreEnforcer(void * targs) {
     float          cur_temp    = 0.0;
     float          scale_denum = init_temp;
     volatile float sink        = init_temp;
+
+    // continue until done is triggered when all threads are within range. The
+    // reason this needs to continue for a given thread even after it has
+    // reached it's desired temperature is that other threads might still be
+    // cooling/heating so this thread must maintain its temperature (if it just
+    // returns it will effectively sleep and cool off its core)
     while (!(*done)) {
         int32_t todo =
             inRange(init_temp, allowed_variance, &cur_temp, fd, fd_lock);
@@ -299,11 +311,9 @@ perCoreEnforcer(void * targs) {
 
 // ensures temperature is within a certain range based on temps and
 // allowed variance.
+// tmp_barrier : barrier we are waiting on
 static void
-enforceWithinRange(temp_barrier * tmp_barrier  // barrier we are using
-                                               // for waiting
-
-) {
+enforceWithinRange(temp_barrier * tmp_barrier) {
 
     // store barrier variables in locals for cleanliness
     uint32_t timeout_sec     = tmp_barrier->timeout_sec;
@@ -498,13 +508,11 @@ enforceWithinRange(temp_barrier * tmp_barrier  // barrier we are using
     errdie("Error, temperatures never cooled off\n");
 }
 
-
 // regulates temperature so that it falls below a threshold determined
 // temps and allowed variance.
+// tmp_barrier : barrier we are waiting on
 static void
-enforceBelowThresh(temp_barrier * tmp_barrier  // barrier we are using
-                                               // for waiting
-) {
+enforceBelowThresh(temp_barrier * tmp_barrier) {
 
     // store barrier variables in locals for cleanliness
     uint32_t timeout_sec     = tmp_barrier->timeout_sec;
@@ -572,10 +580,12 @@ enforceBelowThresh(temp_barrier * tmp_barrier  // barrier we are using
 }
 
 
-// initializes a temp_barrier_attr with default values.
+/*
+  initializes a temp_barrier_attr with default values.
+  attr  : attr to be initialized
+*/
 void
-initAttr(temp_barrier_attr * attr  // attr being initialized
-) {
+initAttr(temp_barrier_attr * attr) {
     attr->cpus             = NULL;
     attr->usec_sleep_time  = DEFAULT_SLEEP;
     attr->timeout_sec      = DEFAULT_TIMEOUT;
@@ -590,80 +600,77 @@ initAttr(temp_barrier_attr * attr  // attr being initialized
 
 // sets a given field in attr struct. Each function corresponds to a
 // field I bet you can figure out.
+// attr             : attr being set
+// usec_sleep_time  : sleep time to set (between checking temperatures)
 void
-attrSetSleepUS(temp_barrier_attr * attr,  // attr being
-                                          // set
-
-               int32_t usec_sleep_time  // new field
-               // value
-) {
+attrSetSleepUS(temp_barrier_attr * attr, int32_t usec_sleep_time) {
 
     DBG_ASSERT(attr, "attr not set\n");
     attr->usec_sleep_time = usec_sleep_time;
 }
 
+// sets the timeout field of attr struct
+// attr         : attr being set
+// timeout_sec  : timeout for when to give up on enforcement
 void
-attrSetTimeoutSec(temp_barrier_attr * attr,  // attr being
-                                             // set
-
-                  uint32_t timeout_sec  // new field
-                  // value
-) {
+attrSetTimeoutSec(temp_barrier_attr * attr, uint32_t timeout_sec) {
     DBG_ASSERT(attr, "attr not set\n");
     attr->timeout_sec = timeout_sec;
 }
 
+
+// sets the allowed variance field of attr struct
+// attr             : attr being set
+// allowed_variance : allowed variance for cur temperature vs initial value when
+//                    cooling
 void
-attrSetAllowedVariance(temp_barrier_attr * attr,  // attr being set
-                       float allowed_variance     // new field value
-) {
+attrSetAllowedVariance(temp_barrier_attr * attr, float allowed_variance) {
     DBG_ASSERT(attr, "attr not set\n");
     attr->allowed_variance = allowed_variance;
 }
 
-void
-attrSetInitTemps(temp_barrier_attr * attr,  // attr being
-                                            // set
 
-                 float * init_temps  // new field
-                 // value
-) {
+// sets the init_temps field of attr struct
+// attr             : attr being set
+// init_temps       : array with temperatures to enforce to for each core
+void
+attrSetInitTemps(temp_barrier_attr * attr, float * init_temps) {
     DBG_ASSERT(attr, "attr not set\n");
     attr->init_temps = init_temps;
 }
 
-void
-attrSetTrials(temp_barrier_attr * attr,  // attr being
-                                         // set
 
-              int32_t ntrials  // new field
-              // value
-) {
+// sets the ntrials field of attr struct
+// attr             : attr being set
+// ntrials          : only relevant if storing for each temperature read. This
+//                    just allows exact allocation. It is not necessary for
+//                    correctness.
+void
+attrSetTrials(temp_barrier_attr * attr, int32_t ntrials) {
 #ifdef STORE_DATA
     DBG_ASSERT(attr, "attr not set\n");
     attr->ntrials = ntrials;
 #endif
 }
 
-void
-attrSetEnforcer(temp_barrier_attr * attr,  // attr being
-                                           // set
 
-                enforcer_modes mode  // new field
-                // value
-) {
+// sets the mode field of attr struct
+// attr             : attr being set
+// mode             : mode for temperature enforcer. This is either within range
+//                    or below threshold.
+void
+attrSetEnforcer(temp_barrier_attr * attr, enforcer_modes mode) {
     DBG_ASSERT(attr, "attr not set\n");
     attr->enf_mode = mode;
 }
 
 
+// sets the init_temps field of attr struct
+// attr             : attr being set
+// cpus             : cpu set to tell barrier which core temperatures to enforce
+//                    around. If not set will default to all cores on machine.
 void
-attrSetCPUS(temp_barrier_attr * attr,  // attr being
-                                       // set
-
-            cpu_set_t * cpus  // new field
-            // value
-) {
+attrSetCPUS(temp_barrier_attr * attr, cpu_set_t * cpus) {
     DBG_ASSERT(attr, "attr not set\n");
     attr->cpus = cpus;
 }
@@ -681,16 +688,12 @@ setDefaultCPU() {
 }
 
 // initializes new temp barrier. Returns ptr to dynamically allocated
-// region of memory storing the barrier
+// region of memory storing the barrier.
+// barrier_num      : for initializing pthread_barrier_t. Is number of waits for
+//                    barrier to expect for releasing.
+// attr             : attr struct with values for initializing the barrier
 temp_barrier *
-initTempBarrier(int32_t barrier_num,  // cant see a situation
-                                      // where this can be
-                                      // guessed
-
-                temp_barrier_attr * attr  // attr with values for
-                // setting fields in
-                // temp_barrier
-) {
+initTempBarrier(int32_t barrier_num, temp_barrier_attr * attr) {
 
     // allocate tmp_barrier
     temp_barrier * tmp_barrier =
@@ -786,16 +789,13 @@ initTempBarrier(int32_t barrier_num,  // cant see a situation
 // be set by 1 thread and 1 thread only to actually do the call to
 // regulate temp. Just about nothing in the temp barrier is safe for
 // concurrency
+// tmp_barirer: barrier for sleeping/cooling off.
+// coordinator: boolean to say whether this call should actually make the
+//              enforce temperature call or just hang at pthread_barrier. Must
+//              be set by at least one of the waiting threads (and example might
+//              be passing (!tid)
 void
-tempBarrierWait(temp_barrier * tmp_barrier,  // barrier for
-                                             // sleeping/cooloff
-
-                int32_t coordinator  // boolean to
-                // tell thread
-                // if it should
-                // regulate
-                // temperature
-) {
+tempBarrierWait(temp_barrier * tmp_barrier, int32_t coordinator) {
 
     // need 2 barrier wait calls. Otherwise there is a race condition in
     // that coordinator thread could finish before others started using
@@ -827,9 +827,9 @@ tempBarrierWait(temp_barrier * tmp_barrier,  // barrier for
 
 
 // free all memory assosiated with barrier
+// tmp_barrier: barrier being freed;
 void
-freeTempBarrier(temp_barrier * tmp_barrier  // temp barrier
-                                            // to free
+freeTempBarrier(temp_barrier * tmp_barrier
 ) {
     pthread_barrier_destroy(&tmp_barrier->barrier);
     myfree(tmp_barrier->fds);
@@ -855,16 +855,10 @@ freeTempBarrier(temp_barrier * tmp_barrier  // temp barrier
 
 
 // prints data from sleeping. only does anything if STORE_DATA is defined
+// tmp_barrier : barrier whose data is being printed
+// outfile     : file to write the data to (can be stdout or stderr)
 void
-printBarrierData(temp_barrier * tmp_barrier,  // temp barrier
-                                              // whose data
-                                              // we are
-                                              // printing
-
-                 FILE * outfile  // file to
-                 // print data
-                 // to
-) {
+printBarrierData(temp_barrier * tmp_barrier, FILE * outfile) {
 #ifdef STORE_DATA
     int32_t ncores = tmp_barrier->ncores;
 

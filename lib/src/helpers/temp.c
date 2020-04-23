@@ -9,16 +9,17 @@
 // otherwise its set in createTempbasepath
 static int32_t temp_path_type = TEMP_PATH_TYPE;
 
+// number of base paths to check
+#define BASE_PATHS 2
 
-#define BASE_PATHS 2  // number of base paths to
-// check
+// number of sub paths to recurse with
+#define SUB_PATHS 2
 
-#define SUB_PATHS 2  // number of sub paths to
-// recurse with
+// number of target files to check
+#define TARGET_FILES 1
 
-#define TARGET_FILES 1  // number of target files to
-// check
-#define TARGET_CONTENTS 1  // target content matches
+// target content matches
+#define TARGET_CONTENTS 1
 
 
 // search strategy is to start recursively checking are
@@ -53,8 +54,8 @@ const static char target_contents[TARGET_CONTENTS][SMALL_PATH_LEN] = {
 // than nothing. We will not be able to get different temperatures for
 // different cores with this approach.
 
-#define ZONE_TARGET_CONTENTS 2  // number of zones currently
-// able to look for
+// number of zones currently able to look for
+#define ZONE_TARGET_CONTENTS 2
 
 // we are looking through /sys/class/thermal/thermal_zone*/type
 const static char zone_format_path[SMALL_PATH_LEN] =
@@ -64,7 +65,7 @@ const static char zone_target_contents[ZONE_TARGET_CONTENTS][SMALL_PATH_LEN] = {
     "x86_pkg_temp",  // max temp of all cores x86_64
 
     "bcm2835_thermal"  // temp on my raspberry pi,
-    // probably not generic
+                       // probably not generic
 };
 
 
@@ -73,9 +74,9 @@ static char temp_base_path[BIG_PATH_LEN] = TEMP_PATH;
 
 // checks if a given directory is a valid subpath. Return 1 id d_name
 // is a valid subpath, otherwise returns 0
+// d_name : directory to test
 static int32_t
-isSubPath(char * d_name  // directory to test
-) {
+isSubPath(char * d_name) {
 
     // check all sub_paths
     for (int32_t i = 0; i < SUB_PATHS; i++) {
@@ -168,13 +169,10 @@ testTempPath_zone() {
 }
 
 // recursive function for finding temperature path
+// test_path: path to test on. This could be a subpath towards final dir or
+//            final dir
 static int32_t
-testTempPath_dir(char * test_path  // path to test
-                                   // on. This could be a
-                                   // subpath towards
-                                   // final dir or final
-                                   // dir
-) {
+testTempPath_dir(char * test_path) {
 
     // for recursively checking
     char possible_temp_path[BIG_PATH_LEN] = "";
@@ -253,12 +251,9 @@ testTempPath_dir(char * test_path  // path to test
 
 // finds directory that contains temp data for each core
 // that path is set in the global base_path
+// outstr: string to write temp_base_path to. This is for compile time config
 int32_t
-createTempBasePath(char * outstr  // string to write
-                                  // temp_base_path
-                                  // to. This is for
-                                  // compile time config
-) {
+createTempBasePath(char * outstr) {
     // trying all known base_paths
     for (int32_t i = 0; i < BASE_PATHS; i++) {
 
@@ -303,9 +298,9 @@ createTempBasePath(char * outstr  // string to write
 // reads temperature of a given fd. Basically this just reads file,
 // resets file offset so it can be read again, and returns the content
 // as a float
+// fd: fd to file to read temp from
 float
-getTemp(int32_t fd  // fd to file to read temp from
-) {
+getTemp(int32_t fd) {
 
     // read contents int32_to tmp_buf
     char tmp_buf[SMALL_READ_LEN] = "";
@@ -325,11 +320,10 @@ getTemp(int32_t fd  // fd to file to read temp from
 
 // reads all files that the fds array contains and returns dynamically
 // allocated array with the temperatures of each file
+// ncores : number of cores/file
+// fds    :  pointer to array of fds to temp files
 float *
-readNStore(int32_t   ncores,  // number of cores/file
-           int32_t * fds      // point32_ter to array of
-           // fds to temp files
-) {
+readNStore(int32_t ncores, int32_t * fds) {
 
     // alocate temperature array
     float * temp_line = (float *)mycalloc(ncores, sizeof(float));
@@ -367,15 +361,12 @@ getTempFiles(int32_t ncores, cpu_set_t * cpus) {
 
 // gets temp files if using temperature directory to find individual
 // cpu temperatures
+// ncores  : number of cores we want to get temp file for
+// cpus    : cpu set of the cores in question
 #define REG_MATCH 0
 static int32_t *
-getTempFiles_dir(int32_t ncores,  // number of cores we
-                                  // want to get temp
-                                  // file for
+getTempFiles_dir(int32_t ncores, cpu_set_t * cpus) {
 
-                 cpu_set_t * cpus  // cpu set of the cores
-                 // in question
-) {
     regex_t regex_name, regex_label;
     int32_t ret;
 
@@ -535,14 +526,12 @@ getTempFiles_dir(int32_t ncores,  // number of cores we
 
 
 // gets cpu temperature using zone (all cpus use same fd in this case).
-static int32_t *
-getTempFiles_zone(int32_t ncores,  // number of cores we
-                                   // want to get temp
-                                   // file for
+// ncores : number of cores we want to get temp file for
+// cpus   : cpu set of the cores in question
 
-                  cpu_set_t * cpus  // cpu set of the cores
-                  // in question
-) {
+
+static int32_t *
+getTempFiles_zone(int32_t ncores, cpu_set_t * cpus) {
 
     int32_t * fds = (int32_t *)mycalloc(ncores, sizeof(int32_t));
 

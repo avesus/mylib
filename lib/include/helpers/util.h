@@ -30,7 +30,6 @@
 //////////////////////////////////////////////////////////////////////
 
 extern const char * progname;
-#define NUM_CORES sysconf(_SC_NPROCESSORS_ONLN)
 
 #define DBG_ASSERT(X, msg, args...)                                            \
     {                                                                          \
@@ -59,9 +58,11 @@ extern const char * progname;
 #define errdie(msg, args...)                                                   \
     dieOnErrno(__FILE__, __LINE__, pthread_self(), errno, msg, ##args);        \
     assert(0)
+
 #define errdie_ID(ID, msg, args...)                                            \
     dieOnErrno(__FILE__, __LINE__, ID, errno, msg, ##args);                    \
     assert(0)
+
 void dieOnErrno(const char * fn,
                 int32_t      ln,
                 uint64_t     ID,
@@ -186,8 +187,18 @@ double getMax(uint64_t * arr, uint32_t len);
 #define us_per_sec  ((uint64_t)1000000)
 #define ms_per_sec  ((uint64_t)1000)
 
-enum time_unit { s = 1, ms = ms_per_sec, us = us_per_sec, ns = ns_per_sec };
-static const char time_unit_str[4][4] = { "s", "ms", "us", "ns" };
+enum time_unit {
+    s  = 1,
+    ms = ms_per_sec,
+    us = us_per_sec,
+    ns = ns_per_sec,
+};
+static const char time_unit_str[4][4] = {
+    "s",
+    "ms",
+    "us",
+    "ns",
+};
 
 uint64_t     to_nsecs(struct timespec t);
 uint64_t     ns_diff(struct timespec t1, struct timespec t2);
