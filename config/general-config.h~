@@ -1,0 +1,40 @@
+#ifndef _GENERAL_CONFIG_H_
+#define _GENERAL_CONFIG_H_
+
+
+#define NCORES ((uint64_t)sysconf(_SC_NPROCESSORS_ONLN))
+#define L1_CACHE_LINE_SIZE 64
+#define L1_LOG_CACHE_LINE_SIZE 6
+
+//#define STACK_TRACE_ON
+#define FRAME_DEBUGGER
+#define DEBUG_MODE
+#define USAGE_CHECK
+
+#define ERROR_VERBOSE 0
+#define LOW_VERBOSE 1
+#define MED_VERBOSE 2
+#define HIGH_VERBOSE 3
+
+#if defined ERROR_VERBOSE || LOW_VERBOSE || defined MED_VERBOSE || defined HIGH_VERBOSE
+#define VERBOSE
+#include <stdint.h>
+extern int32_t verbose;
+#endif
+
+
+#define SMALL_READ_LEN 16
+
+
+#define SMALL_PATH_LEN 128
+#define MED_PATH_LEN 256
+#define BIG_PATH_LEN 512
+
+
+#define SMALL_BUF_LEN 32
+#define MED_BUF_LEN 128
+#define BIG_BUF_LEN 512
+
+
+#define ptype ms //unit for timing output
+#endif
