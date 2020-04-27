@@ -21,11 +21,11 @@ struct p_info {
     string       name;
     size_t       frag_num;
     string       file;
-    string       agr_outbuf;
+    string &     agr_outbuf;
     receiver_t * recvr;
     int32_t * volatile frags_left;
     int32_t * volatile progress_state;
-    p_info() {}
+    p_info(string & in_outbuf) : agr_outbuf(in_outbuf) {}
 };
 
 
@@ -33,13 +33,13 @@ class sync_que {
 
     mutex m;
 
-    queue<p_info *> que;
+    queue<p_info> que;
 
    public:
     condition_variable cv;
     volatile uint64_t  done = 0;
-    void               push(p_info * p);
-    p_info *           pop();
+    void               push(p_info p);
+    p_info             pop();
 
     size_t
     size() {

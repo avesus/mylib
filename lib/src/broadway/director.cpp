@@ -243,9 +243,8 @@ Director::cue(uint32_t idx) {
     unique_lock<mutex> lock(m);
     string             agr_outbuf = "";
     agr_outbuf += CONTENT_MSG;
-    vector<p_info *> p;
     int32_t * volatile nfrags = (int32_t *)mymalloc(sizeof(int32_t));
-    *nfrags                   = configs.size();
+    *nfrags                   = 8;
 
     for (size_t frag = 0; frag < configs.size() + 1; frag++) {
         cv.wait(lock,
@@ -253,33 +252,32 @@ Director::cue(uint32_t idx) {
         if (frag == configs.size()) {
             break;
         }
-        p.push_back(new p_info());
         // reset play counter between fragments. This resets error
         // checking for missing lines, prints new scene if needed/does
         // any other book keeping
-        this->p->reset_counter();
+        this->p->reset_counter(agr_outbuf);
 
         // set number of expected players for checking skipped line for
         // given fragment
 
         this->p->set_on_stage(n_players[frag]);
 
-        p[frag]->frag_num       = frag;
-        p[frag]->progress_state = (int32_t * volatile) & this->in_progress;
-        p[frag]->recvr          = this->connect->net_recvr;
-        p[frag]->frags_left     = nfrags;
-        p[frag]->agr_outbuf     = agr_outbuf;
+        p_info pi(agr_outbuf);
+        pi.frag_num       = frag;
+        pi.progress_state = (int32_t * volatile) & this->in_progress;
+        pi.recvr          = this->connect->net_recvr;
+        pi.frags_left     = nfrags;
         PRINT(HIGH_VERBOSE,
-              "Queing frame[%d] %ld/%ld\n",
-              *p[frag]->frags_left,
-              frag,
-              configs.size() - 1);
+              "Queing frame[%d] %ld/8\n",
+              *pi.frags_left,
+              frag);
 
         string buf;
         while (getline(this->configs[frag], buf)) {
-            if (istringstream(buf) >> p[frag]->name >> p[frag]->file) {
+            if (istringstream(buf) >> pi.name >> pi.file) {
+                fprintf(stderr, "MARKERHIT START: %s: %s\n",pi.name.c_str(), pi.file.c_str());
                 // initialize que for worker threads to read from
-                frag_que.push(p[frag]);
+                frag_que.push(pi);
             }
         }
     }

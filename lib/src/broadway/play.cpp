@@ -16,9 +16,15 @@ Play::recite(set<line>::iterator & it,
 
         n_passed++;
 
+        fprintf(stderr,
+                "handling line: %d[%s] -> %s\n",
+                it->linen,
+                it->character.c_str(),
+                it->msg.c_str());
 
         // case where no player for the current line
         if (n_passed == on_stage) {
+            fprintf(stderr, "Case 1(%d)\n", it->linen);
             // nobody could read this line, need to skip it
             agr_outbuf += "\n";
             agr_outbuf += "****** line ";
@@ -35,19 +41,29 @@ Play::recite(set<line>::iterator & it,
     // error case
     if (line_counter != it->linen ||
         this->scene_fragment_counter > expec_fragments_lines) {
-        agr_outbuf += "\n";
+        fprintf(stderr,
+                "Case 2(%d) [%d != %d || %d > %d]\n",
+                it->linen,
+                line_counter,
+                it->linen,
+                this->scene_fragment_counter,
+                expec_fragments_lines);
+        
+        /*        agr_outbuf += "\n";
         agr_outbuf += "****** line ";
         agr_outbuf += to_string(it->linen);
         agr_outbuf += " said by ";
         agr_outbuf += it->character;
-        agr_outbuf += " skipped fragment ******";
+        agr_outbuf += " skipped fragment ******";*/
 
         this->it++;
         cv.notify_all();
+        return;
     }
 
     // change of character
     if (cur_char != it->character) {
+        fprintf(stderr, "Case 3(%d)\n", it->linen);
         if (cur_char != "") {
             agr_outbuf += "\n\n";
         }
@@ -56,6 +72,7 @@ Play::recite(set<line>::iterator & it,
         agr_outbuf += '.';
     }
 
+    fprintf(stderr, "Case 4(%d)\n", it->linen);
     // actually printing the line
     agr_outbuf += "\n";
     agr_outbuf += to_string(it->linen);

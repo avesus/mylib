@@ -38,36 +38,37 @@ Player::read(string name, string file) {
 
 // recites each of the lines for this fragment number of the player
 void
-Player::act(p_info * pi) {
+Player::act(p_info pi) {
     for (auto it = lines.begin(); it != lines.end(); it++) {
-        PRINT(HIGH_VERBOSE, "Doing line: %d\n", it->linen);
-        if ((*(pi->progress_state)) == CANCELLED) {
-            clear_recvr_outbuf(pi->recvr);
+        PRINT(HIGH_VERBOSE, "(%ld) Doing line Outside: %d[%s]: %s\n", pthread_self(),it->linen, it->character.c_str(), it->msg.c_str());
+        if ((*(pi.progress_state)) == CANCELLED) {
+            die("Currently unsupported\n");
+            clear_recvr_outbuf(pi.recvr);
             p.player_exit(CANCELLED);
             break;
         }
-        p.recite(it, pi->frag_num, pi->agr_outbuf);
+        p.recite(it, pi.frag_num, pi.agr_outbuf);
     }
 
-
-    if ((*(pi->progress_state)) != CANCELLED) {
-        (*(pi->progress_state)) = READY;
+    fprintf(stderr, "MARKERHIT DONE\n");
+    if ((*(pi.progress_state)) != CANCELLED) {
+        (*(pi.progress_state)) = READY;
         p.player_exit(READY);
-        if (__atomic_sub_fetch((pi->frags_left), 1, __ATOMIC_RELAXED) == 0) {
-            DBG_ASSERT(pi->agr_outbuf[0] == CONTENT_MSG,
+        if (__atomic_sub_fetch((pi.frags_left), 1, __ATOMIC_RELAXED) == 0) {
+            DBG_ASSERT(pi.agr_outbuf[0] == CONTENT_MSG,
                        "Error type got corrupted %d -> %d\n",
                        CONTENT_MSG,
-                       pi->agr_outbuf[0]);
+                       pi.agr_outbuf[0]);
             PRINT(HIGH_VERBOSE,
                   "Preparing to write: [%ld] ->\n%s\n",
-                  HEADER_SIZE + pi->agr_outbuf.length(),
-                  pi->agr_outbuf.c_str());
+                  HEADER_SIZE + pi.agr_outbuf.length(),
+                  pi.agr_outbuf.c_str());
 
-            prepare_send_recvr(pi->recvr,
-                               HEADER_SIZE + pi->agr_outbuf.length(),
-                               (uint8_t *)pi->agr_outbuf.c_str());
+            prepare_send_recvr(pi.recvr,
+                               HEADER_SIZE + pi.agr_outbuf.length(),
+                               (uint8_t *)pi.agr_outbuf.c_str());
 
-            reset_recvr_event(pi->recvr, &handle_event, EV_WRITE, WRITING);
+            reset_recvr_event(pi.recvr, &handle_event, EV_WRITE, WRITING);
         }
     }
 
@@ -81,14 +82,12 @@ Player::act(p_info * pi) {
 void
 Player::work(sync_que & q, condition_variable & cv_dir) {
     while (!q.done) {
-        p_info * p = q.pop();
+        p_info p = q.pop();
         if (q.done) {
             break;
         }
-        if (!p) {
-            continue;
-        }
-        read(p->name, p->file);
+
+        read(p.name, p.file);
         act(p);
         cv_dir.notify_all();
     }

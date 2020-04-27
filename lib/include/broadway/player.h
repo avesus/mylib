@@ -37,7 +37,7 @@ class Player {
 
     void read(string name, string file);
 
-    void act(p_info * pi);
+    void act(p_info pi);
 
     void work(sync_que & q, condition_variable & cv_dir);
 

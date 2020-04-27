@@ -66,9 +66,10 @@ class Play {
 
     // between scenes reset/printout scene name if possible
     void
-    reset_counter() {
+    reset_counter(string & agr_outbuf) {
         if (*it != "") {
-            cout << *it << endl;
+            agr_outbuf += "\n\n";
+            agr_outbuf += *it;
         }
 
         this->line_counter = 1;
