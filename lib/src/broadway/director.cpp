@@ -1,5 +1,25 @@
 #include <broadway/director.h>
 
+static void
+priority_kill_msg(receiver_t * recvr) {
+    // we are never giving up this lock as director is exiting...
+    ACQUIRE_OUTBUF(recvr->outbuf);
+    recvr->outbuf_cur_size = 0;
+
+    TYPE_TYPE   type = KILL_MSG;
+    HEADER_TYPE hdr  = HEADER_SIZE + TYPE_SIZE;
+    // ignore locks we already have
+    store_recvr_outbuf(recvr, (uint8_t *)(&hdr), HEADER_SIZE, 0);
+    store_recvr_outbuf(recvr, (uint8_t *)(&type), TYPE_SIZE, 0);
+
+
+    // force this write to go through...
+    make_blocking(recvr->fd);
+    myrobustwrite(recvr->fd, OUTBUF_PTR(recvr->outbuf), hdr);
+
+    fprintf(stderr, "Priority message sent\n");
+    // dont unset lock. no more messages should be sent
+}
 
 static void
 send_type(receiver_t * recvr, TYPE_TYPE type) {
@@ -59,7 +79,8 @@ handle_net_cmd(void * arg, io_data * data_buf) {
                    "Error invalid length(%d) for KILL_MSG\n",
                    data_buf->length);
 
-        send_type(recvr, KILL_MSG);
+        priority_kill_msg(recvr);
+        // send_type(recvr, KILL_MSG);
         this_director->~Director();
     }
     else if (type == AVAIL_MSG) {
@@ -87,9 +108,10 @@ handle_net_cmd(void * arg, io_data * data_buf) {
             this_director->send_avails();
 
             // start the play
-            this_director->cue();
+            this_director->cue(0);
         }
         else {
+            this_director->send_avails();
             fprintf(stderr, "Noah remember to put a control message here\n");
         }
     }
@@ -101,13 +123,13 @@ handle_net_cmd(void * arg, io_data * data_buf) {
         this_director->in_progress     = CANCELLED;
         this_director->last_recognized = CANCELLED;
 
-        //update state with cancelled
+        // update state with cancelled
         this_director->update_status_idx(this_director->last_play_idx);
 
-        //send message to show was cancelled
+        // send message to show was cancelled
         this_director->send_avails();
 
-        //reset state and send updated avail messages
+        // reset state and send updated avail messages
         this_director->in_progress     = READY;
         this_director->last_recognized = READY;
         this_director->send_avails();
@@ -214,12 +236,17 @@ Director::~Director() {
 
 
 void
-Director::cue() {
+Director::cue(uint32_t idx) {
 
     // iterates through scene fragments and coordinates players/play
     // based on current/next fragment
     unique_lock<mutex> lock(m);
-    vector<p_info *>   p;
+    string             agr_outbuf = "";
+    agr_outbuf += CONTENT_MSG;
+    vector<p_info *> p;
+    int32_t * volatile nfrags = (int32_t *)mymalloc(sizeof(int32_t));
+    *nfrags                   = configs.size();
+
     for (size_t frag = 0; frag < configs.size() + 1; frag++) {
         cv.wait(lock,
                 [&] { return !(this->p->get_on_stage() + frag_que.size()); });
@@ -240,7 +267,13 @@ Director::cue() {
         p[frag]->frag_num       = frag;
         p[frag]->progress_state = (int32_t * volatile) & this->in_progress;
         p[frag]->recvr          = this->connect->net_recvr;
-        p[frag]->last_frag      = (frag == (configs.size() - 1));
+        p[frag]->frags_left     = nfrags;
+        p[frag]->agr_outbuf     = agr_outbuf;
+        PRINT(HIGH_VERBOSE,
+              "Queing frame[%d] %ld/%ld\n",
+              *p[frag]->frags_left,
+              frag,
+              configs.size() - 1);
 
         string buf;
         while (getline(this->configs[frag], buf)) {

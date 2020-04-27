@@ -1,6 +1,22 @@
 #include <IO/receiver.h>
 
+void
+prepare_send_recvr(receiver_t * recvr, HEADER_TYPE hdr, uint8_t * data) {
 
+
+    DBG_ASSERT(hdr > HEADER_SIZE,
+               "Error trying to prepare an empty message...\n");
+
+    PRINT(LOW_VERBOSE, "prep_writing: %s\n", data);
+    store_recvr_outbuf(recvr, (uint8_t *)(&hdr), HEADER_SIZE, ACQUIRE);
+    store_recvr_outbuf(recvr,
+                       (uint8_t *)data,
+                       (hdr - (HEADER_SIZE)),
+                       RELEASE);
+
+    reset_recvr_event(recvr, &handle_event, EV_WRITE, WRITING);
+}
+    
 void
 clear_recvr_outbuf(receiver_t * recvr) {
     ACQUIRE_OUTBUF(recvr->outbuf);
@@ -83,6 +99,7 @@ free_recvr(receiver_t * recvr) {
 
     close(recvr->fd);
     myfree(recvr->buf);
+    myfree(OUTBUF_PTR(recvr->outbuf));
     if (recvr->dest) {
         recvr->dest(recvr);
     }
@@ -461,8 +478,12 @@ handle_write(receiver_t * recvr) {
                recvr->ev_state,
                WRITING);
 
+    // if priority we already have acquired the lock successfully
+    fprintf(stderr, "In write handler\n");
+    if (!IS_PRIORITY(recvr->outbuf)) {
+        ACQUIRE_OUTBUF(recvr->outbuf);
+    }
 
-    ACQUIRE_OUTBUF(recvr->outbuf);
 
     PRINT(HIGH_VERBOSE,
           "Writing[%p (%d)]\n",
@@ -479,8 +500,16 @@ handle_write(receiver_t * recvr) {
                recvr->outbuf_cur_size);
 
     recvr->outbuf_cur_size = 0;
-    RELEASE_OUTBUF(recvr->outbuf);
 
+    // if priority we will leave unlocking up to caller
+    if (IS_PRIORITY(recvr->outbuf)) {
+
+        //to inform sender message has gone through
+        SET_PRIORITY(recvr->outbuf);
+    }
+    else {
+        RELEASE_OUTBUF(recvr->outbuf);
+    }
     reset_recvr_event(recvr, &handle_event, EV_READ, WAITING);
 }
 

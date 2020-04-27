@@ -52,7 +52,9 @@ class Play {
 
 
     // recites a play by coordinating playesr
-    string recite(set<line>::iterator & it, int32_t expec_fragment_lines);
+    void recite(set<line>::iterator & it,
+                int32_t               expec_fragment_lines,
+                string &              agr_outbuf);
 
 
     // reset skipped line tracker
@@ -107,7 +109,7 @@ class Play {
             n_passed               = 0;
             return "";
         }
-        
+
         string ret_buf = "";
 
         // last line is bad

@@ -40,23 +40,33 @@ Player::read(string name, string file) {
 void
 Player::act(p_info * pi) {
     for (auto it = lines.begin(); it != lines.end(); it++) {
+        PRINT(HIGH_VERBOSE, "Doing line: %d\n", it->linen);
         if ((*(pi->progress_state)) == CANCELLED) {
             clear_recvr_outbuf(pi->recvr);
             p.player_exit(CANCELLED);
             break;
         }
-        string ret_buf = p.recite(it, pi->frag_num);
-        store_recvr_outbuf(pi->recvr,
-                           (uint8_t *)ret_buf.c_str(),
-                           HEADER_SIZE + TYPE_SIZE + ret_buf.length(),
-                           ACQUIRE | RELEASE);
+        p.recite(it, pi->frag_num, pi->agr_outbuf);
     }
 
 
     if ((*(pi->progress_state)) != CANCELLED) {
         (*(pi->progress_state)) = READY;
         p.player_exit(READY);
-        if (pi->last_frag) {
+        if (__atomic_sub_fetch((pi->frags_left), 1, __ATOMIC_RELAXED) == 0) {
+            DBG_ASSERT(pi->agr_outbuf[0] == CONTENT_MSG,
+                       "Error type got corrupted %d -> %d\n",
+                       CONTENT_MSG,
+                       pi->agr_outbuf[0]);
+            PRINT(HIGH_VERBOSE,
+                  "Preparing to write: [%ld] ->\n%s\n",
+                  HEADER_SIZE + pi->agr_outbuf.length(),
+                  pi->agr_outbuf.c_str());
+
+            prepare_send_recvr(pi->recvr,
+                               HEADER_SIZE + pi->agr_outbuf.length(),
+                               (uint8_t *)pi->agr_outbuf.c_str());
+
             reset_recvr_event(pi->recvr, &handle_event, EV_WRITE, WRITING);
         }
     }

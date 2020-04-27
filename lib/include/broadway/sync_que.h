@@ -21,8 +21,9 @@ struct p_info {
     string       name;
     size_t       frag_num;
     string       file;
-    int32_t      last_frag;
+    string       agr_outbuf;
     receiver_t * recvr;
+    int32_t * volatile frags_left;
     int32_t * volatile progress_state;
     p_info() {}
 };

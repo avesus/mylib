@@ -14,6 +14,12 @@
 
 #define OUTBUF_PTR(X) ((uint8_t *)low_bits_get_ptr((X)))
 
+#define PRIORITY_OUTBUF_MASK (lb_write_locked - 1)
+// this is kind of hacky but basically will atomically decrement ptr
+#define SET_PRIORITY(X) (lb_unlock_rd((uint64_t * volatile)(&(X))))
+#define IS_PRIORITY(X)  (low_bits_get((X)) == PRIORITY_OUTBUF_MASK)
+
+
 #define ACQUIRE 0x1
 #define RELEASE 0x2
 
@@ -71,11 +77,11 @@ typedef struct receiver {
 
 
 void clear_recvr_outbuf(receiver_t * recvr);
-
 void store_recvr_outbuf(receiver_t * recvr,
                         uint8_t *    to_add,
                         uint32_t     size_to_add,
-                        uint32_t lock_flags);
+                        uint32_t     lock_flags);
+void prepare_send_recvr(receiver_t * recvr, HEADER_TYPE hdr, uint8_t * data);
 
 void free_recvr(receiver_t * recvr);
 
@@ -94,12 +100,12 @@ receiver_t * init_recvr(int32_t             fd,
                         cmd_handler         rd_handle);
 
 io_data * handle_read(receiver_t * recvr);
-void handle_write(receiver_t * recvr);
+void      handle_write(receiver_t * recvr);
 
 void reset_recvr_event(receiver_t * recvr,
                        void         ev_handler(const int, const short, void *),
                        int32_t      new_flags,
-        event_states ev_state);
+                       event_states ev_state);
 
 void handle_stdin_event(const int fd, const short which, void * arg);
 void handle_event(const int fd, const short which, void * arg);

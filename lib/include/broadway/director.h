@@ -35,7 +35,7 @@ class Director {
     vector<string>   statuses;   // status of each play
     vector<string>   names;      // names of all roles
     vector<ifstream> configs;    // will store where each scenes config file is
-    vector<int>      n_players;  // number of players for each scene
+    vector<int32_t>  n_players;  // number of players for each scene
     shared_ptr<Play> p;          // play class to actually do the scenes
     vector<shared_ptr<Player>> players;  // all necessary players
     mutex                      m;
@@ -56,7 +56,7 @@ class Director {
 
     ~Director();
     // coordinates the recitation of each play fragment
-    void    cue();
+    void    cue(uint32_t idx);
     string  format_avails();
     int32_t update_status_idx(uint32_t idx);
     void    send_avails();
