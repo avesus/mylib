@@ -1,6 +1,6 @@
 include ../common.mk
 
-SRCS=src/*/*.c
+SRCS=src/*/*.c*
 
 all: objs
 

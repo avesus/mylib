@@ -8,7 +8,7 @@ BIN_DIR=${CURDIR}/bin
 
 #set debug mode, all the options because typing "DEBUG_MODE" or
 #"DEBUG" might be cumbersome ...
-D=0
+D=1
 DEBUG=0
 DEBUG_MODE=0
 ifneq ($(D), 0)
@@ -40,4 +40,4 @@ CFLAGS=-O0 -std=c++11 -Wall -Wno-pointer-arith -Wno-unused-function -g3 -DDEBUG 
 endif
 
 #ldflags
-LDFLAGS=-lpthread -lm -rdynamic 
+LDFLAGS=-lpthread -lm -rdynamic -levent -levent_pthreads

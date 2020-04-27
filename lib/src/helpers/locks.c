@@ -1,7 +1,7 @@
 #include <helpers/locks.h>
 
 void
-lb_readLock(uint64_t * ptr) {
+lb_readLock(uint64_t * volatile ptr) {
     uint64_t expec = (uint64_t)(*ptr);
     while ((expec & lb_write_locked) == lb_write_locked) {
         do_sleep;
@@ -26,7 +26,7 @@ lb_readLock(uint64_t * ptr) {
 
 
 void
-lb_writeLock(uint64_t * ptr) {
+lb_writeLock(uint64_t * volatile ptr) {
 
     uint64_t expec = (uint64_t)(*ptr);
     expec &= lowBitsPtrMask;
@@ -46,13 +46,13 @@ lb_writeLock(uint64_t * ptr) {
 
 
 void
-lb_unlock_rd(uint64_t * ptr) {
+lb_unlock_rd(uint64_t * volatile ptr) {
     __atomic_sub_fetch((uint64_t *)ptr, 1, __ATOMIC_RELAXED);
 }
 
 
 void
-lb_unlock_wr(uint64_t * ptr) {
+lb_unlock_wr(uint64_t * volatile ptr) {
     uint64_t new_val = (uint64_t)(*ptr);
     new_val &= lowBitsPtrMask;
     __atomic_store_n((uint64_t *)ptr, new_val, __ATOMIC_RELAXED);
@@ -60,7 +60,7 @@ lb_unlock_wr(uint64_t * ptr) {
 
 
 void
-hb_readLock(uint64_t * ptr) {
+hb_readLock(uint64_t * volatile ptr) {
     uint64_t expec = (uint64_t)(*ptr);
     while (((expec >> highBits) & hb_write_locked) == hb_write_locked) {
         do_sleep;
@@ -85,7 +85,7 @@ hb_readLock(uint64_t * ptr) {
 
 
 void
-hb_writeLock(uint64_t * ptr) {
+hb_writeLock(uint64_t * volatile ptr) {
 
     uint64_t expec = (uint64_t)(*ptr);
     expec &= highBitsPtrMask;
@@ -105,13 +105,13 @@ hb_writeLock(uint64_t * ptr) {
 
 
 void
-hb_unlock_rd(uint64_t * ptr) {
+hb_unlock_rd(uint64_t * volatile ptr) {
     __atomic_sub_fetch((uint64_t *)ptr, (1UL << highBits), __ATOMIC_RELAXED);
 }
 
 
 void
-hb_unlock_wr(uint64_t * ptr) {
+hb_unlock_wr(uint64_t * volatile ptr) {
     uint64_t new_val = (uint64_t)(*ptr);
     new_val &= highBitsPtrMask;
     __atomic_store_n((uint64_t *)ptr, new_val, __ATOMIC_RELAXED);
@@ -119,7 +119,7 @@ hb_unlock_wr(uint64_t * ptr) {
 
 
 void
-ab_readLock(uint64_t * ptr) {
+ab_readLock(uint64_t * volatile ptr) {
     uint64_t expec = (uint64_t)(*ptr);
     while (expec == ab_write_locked) {
         do_sleep;
@@ -144,7 +144,7 @@ ab_readLock(uint64_t * ptr) {
 
 
 void
-ab_writeLock(uint64_t * ptr) {
+ab_writeLock(uint64_t * volatile ptr) {
     uint64_t expec   = unlocked;
     uint64_t new_val = ab_write_locked;
     while (!__atomic_compare_exchange(ptr,
@@ -161,12 +161,12 @@ ab_writeLock(uint64_t * ptr) {
 
 
 void
-ab_unlock_rd(uint64_t * ptr) {
+ab_unlock_rd(uint64_t * volatile ptr) {
     __atomic_sub_fetch((uint64_t *)ptr, 1, __ATOMIC_RELAXED);
 }
 
 
 void
-ab_unlock_wr(uint64_t * ptr) {
+ab_unlock_wr(uint64_t * volatile ptr) {
     __atomic_store_n((uint64_t *)ptr, unlocked, __ATOMIC_RELAXED);
 }

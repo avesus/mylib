@@ -224,7 +224,7 @@ printFrame(frame_data_t * frame_data_s, uint32_t index) {
         // likewise + 1 is for the \0
         format_data += format_str_len + 1;
         name_data += name_str_len + 1;
-        var_data = PTR_ADD(void *, var_data, ROUNDUP(var_sizes[i]));
+        var_data = PTR_ADD(void *, var_data, ROUNDUP_AL(var_sizes[i]));
     }
     memset(format_buf + PRINT_ALIGN, 0, 2);
     memset(format_buf, '-', (PRINT_ALIGN - strlen("END") + 1) / 2);

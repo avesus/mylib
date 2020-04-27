@@ -18,8 +18,8 @@
 #define num_high_bits 16
 
 //#define mark_null //table being copied will not add to null items (if they can
-//mark it) #define next_hash //turns on storing next hash optimization #define
-//lazy_resize //turns on lazy resizing (necessary for functioning delete)
+// mark it) #define next_hash //turns on storing next hash optimization #define
+// lazy_resize //turns on lazy resizing (necessary for functioning delete)
 #if defined next_hash && !defined lazy_resize
     #undef next_hash
 #endif
@@ -58,16 +58,16 @@
 
 
 // return values for checking table.  Returned by lookupQuery
-#define not_in  -3  // item is not in (used in query/delete)
-#define in      -1  // item is already in
-#define unknown -2  // unkown keep looking
+#define not_in     (-3)  // item is not in (used in query/delete)
+#define is_in      (-1)  // item is already in
+#define unknown_in (-2)  // unkown keep looking
 
-#define copy 0x1  // sets 1s bit of ent ptr for resizing
+#define copy_bit 0x1  // sets 1s bit of ent ptr for resizing
 
 
 #define getCopy(X) lowBitsGet((void *)(X))
 #define setCopy(X)                                                             \
-    lowBitsSet_atomic((void **)(&(X)), lowBitsGetPtr((void *)(X)), copy)
+    lowBitsSet_atomic((void **)(&(X)), lowBitsGetPtr((void *)(X)), copy_bit)
 
 
 #define set_return(X, Y) ((node *)(((uint64_t)get_ptr(X)) | (Y)))
@@ -99,8 +99,7 @@ typedef pthread_t         key_type;
 typedef struct frame_node node;
 
 
-uint16_t
-genTag(pthread_t t);
+uint16_t genTag(pthread_t t);
 
 // nothing for ints
 #define hashTag(X) (genTag(X))
@@ -120,8 +119,7 @@ genTag(pthread_t t);
 
 //////////////////////////////////////////////////////////////////////
 // Config for hash function table will use
-uint32_t
-murmur3_32(const uint8_t * key, size_t len, uint32_t seed);
+uint32_t murmur3_32(const uint8_t * key, size_t len, uint32_t seed);
 //////////////////////////////////////////////////////////////////////
 
 
@@ -142,9 +140,9 @@ typedef struct subTable {
 
 // head of cache: this is the main hahstable
 typedef struct hashTable {
-    subTable ** tableArray;  // array of tables
-    uint64_t    start;
-    uint64_t end;  // current max index (max exclusive)
+    subTable **    tableArray;  // array of tables
+    uint64_t       start;
+    uint64_t       end;  // current max index (max exclusive)
     const uint32_t seeds[DEFAULT_HASH_ATTEMPTS];
 } hashTable;  // worth it to aligned alloc this
 
@@ -163,21 +161,17 @@ typedef struct hashTable {
 // general api start
 // return 1 if inserted, 0 if already there
 
-node *
-addNode(hashTable * head, node * n, uint32_t tid);
+node * addNode(hashTable * head, node * n, uint32_t tid);
 
 // see if node is in the table
-node *
-findNode(hashTable * table, key_type key, uint32_t tid);
+node * findNode(hashTable * table, key_type key, uint32_t tid);
 
 
 // initialize a new main hashtable
-hashTable *
-initTable();
+hashTable * initTable();
 
 
-void
-freeTable(hashTable * head, void (*freeEnt)(void *));
+void freeTable(hashTable * head, void (*freeEnt)(void *));
 
 //////////////////////////////////////////////////////////////////////
 // general api end

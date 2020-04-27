@@ -152,7 +152,7 @@ lookupQuery(subTable * ht, key_type key, uint32_t slot) {
     }
 
     // go another value, try next hash function
-    return unknown;
+    return unknown_in;
 }
 
 
@@ -188,7 +188,7 @@ lookup(hashTable * head,
     // if values equal case
     else if (compare_keys(getKey(ht->innerTable[slot]), getKey(n))) {
 
-        return in;
+        return is_in;
     }
 
 #ifdef lazy_resize
@@ -202,7 +202,7 @@ lookup(hashTable * head,
         }
     }
 #endif  // lazy_resize
-    return unknown;
+    return unknown_in;
 }
 
 // function to add new subtable to hashtable if dont find open slot
@@ -552,7 +552,7 @@ findNode(hashTable * head, key_type key, uint32_t tid) {
             for (uint32_t c = tag; c < uBound + tag; c++) {
                 int32_t res = lookupQuery(ht, key, slot + (c & (uBound - 1)));
 
-                if (res == unknown) {  // unkown if in our not
+                if (res == unknown_in) {  // unkown if in our not
                     continue;
                 }
                 if (res == not_in) {
@@ -624,9 +624,9 @@ addNode(hashTable * head, node * n, uint32_t tid) {
                     );
                     // lookup value in sub table
 
-                    if (res == unknown) {  // unkown if in our not
+                    if (res == unknown_in) {  // unkown if in our not
                         continue;
-                    } else if (res == in) {  // is in
+                    } else if (res == is_in) {  // is in
                         return set_return(
                             ht->innerTable[slot + (c & (uBound - 1))],
                             1);

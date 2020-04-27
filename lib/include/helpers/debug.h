@@ -7,8 +7,8 @@
 // to ID = 0, N_FRAMES must be >= 1024
 #define N_FRAMES 8
 
-// for clean printing. Variables with name > 16 chars will be an issue
-#define PRINT_ALIGN 16
+// for clean printing. Variables with name > PRINT_ALIGN chars will be an issue
+#define PRINT_ALIGN 24
 
 // low bit 0x1 means >= N_FRAMES have been set (this is necessary for
 // indexing
@@ -23,10 +23,8 @@
 #include <local/hashtable.h>
 #include <local/macro-helper.h>
 
-void
-init_debugger();
-void
-free_debugger();
+void init_debugger();
+void free_debugger();
 
 typedef struct frame_data {
     uint32_t nargs;
@@ -72,7 +70,7 @@ typedef struct frame_data {
 #define TOTAL_GET_SIZE(...) SUM_X_N_Y(GET_SIZE, __VA_ARGS__)
 
 // get size of all data
-#define GET_SIZE(X, Y) ROUNDUP(Y)
+#define GET_SIZE(X, Y) ROUNDUP_AL(Y)
 
 // helper to get size for all and sum
 #define TOTAL_TYPE_LEN(...) SUM(TO_SIZEOF, __VA_ARGS__)
@@ -93,7 +91,7 @@ typedef struct frame_data {
 #define CREATE_BUFFER(ln, X) mycalloc((X + META_DATA_SIZE), sizeof(char));
 
 // rounds up a size.
-#define ROUNDUP(X) (((X) + (ALIGNMENT_MASK)) & (~(ALIGNMENT_MASK)))
+#define ROUNDUP_AL(X) (((X) + (ALIGNMENT_MASK)) & (~(ALIGNMENT_MASK)))
 
 // for aligning so that data types are on ALIGNMENT byte boundary (can be
 // important in some cases)
@@ -128,12 +126,26 @@ typedef struct frame_data {
 // copy region
 #define DEF_TO_COPY_REG(X, Y, Z)                                               \
     memcpy((X), (Y), (Z));                                                     \
-    (X) += ROUNDUP(Z)
+    (X) += ROUNDUP_AL(Z)
 
-// copy variable
-#define DEF_TO_COPY_VAL(X, Y, Z)                                               \
-    *(typeof(Y) *)(X) = (Y);                                                   \
-    (X) += ROUNDUP(Z)
+
+// gcc has typeof, c++ equivilent is decltype
+#ifdef __cpp_attributes
+
+    // copy variable
+    #define DEF_TO_COPY_VAL(X, Y, Z)                                           \
+        *(decltype(Y) *)(X) = (Y);                                             \
+        (X) += ROUNDUP_AL(Z)
+
+#else
+
+    // copy variable
+    #define DEF_TO_COPY_VAL(X, Y, Z)                                           \
+        *(typeof(Y) *)(X) = (Y);                                               \
+        (X) += ROUNDUP_AL(Z)
+
+
+#endif
 
 
 // copy sizeof data helper
@@ -193,10 +205,10 @@ typedef struct frame_data {
                        "Unaligned Size (%d)\n",                                \
                        TOTAL_SIZE);                                            \
                                                                                \
-            void * BUF_PTR = NULL;                                             \
-            node * ID_NODE = findFrame(IDN);                                   \
+            uint8_t * BUF_PTR = NULL;                                             \
+            node * ID_NODE = (node *)findFrame(IDN);                           \
             if (!ID_NODE) {                                                    \
-                ID_NODE = newID_get(IDN);                                      \
+                ID_NODE = (node *)newID_get(IDN);                              \
             }                                                                  \
             uint32_t FRAME_INDEX = high_bits_get(ID_NODE->val);                \
                                                                                \
@@ -206,7 +218,8 @@ typedef struct frame_data {
             FRAME_INDEX &= (N_FRAMES - 1);                                     \
                                                                                \
             high_bits_set_INCR(ID_NODE->val);                                  \
-            frame_data_t ** ID_STRUCT = get_ptr(ID_NODE->val);                 \
+            frame_data_t ** ID_STRUCT =                                        \
+                (frame_data_t **)get_ptr(ID_NODE->val);                        \
                                                                                \
             DBG_ASSERT(low_bits_set_XOR_atomic(ID_NODE->val, ACTIVE) & ACTIVE, \
                        "Duplicate ID(%lu)\n",                                  \
@@ -214,9 +227,10 @@ typedef struct frame_data {
                                                                                \
             if (ID_STRUCT[FRAME_INDEX] && 0 &&                                 \
                 (BLOCK_SIZE(ID_STRUCT[FRAME_INDEX]) >= TOTAL_SIZE)) {          \
-                BUF_PTR = (void *)ID_STRUCT[FRAME_INDEX];                      \
-            } else {                                                           \
-                BUF_PTR = CREATE_BUFFER(ln, TOTAL_SIZE);                       \
+                BUF_PTR = (uint8_t *)ID_STRUCT[FRAME_INDEX];                      \
+            }                                                                  \
+            else {                                                             \
+                BUF_PTR = (uint8_t *)CREATE_BUFFER(ln, TOTAL_SIZE);     \
                 myfree(ID_STRUCT[FRAME_INDEX]);                                \
                 ID_STRUCT[FRAME_INDEX] = (frame_data_t *)BUF_PTR;              \
             }                                                                  \
@@ -322,26 +336,15 @@ typedef struct frame_data {
 
 //////////////////////////////////////////////////////////////////////
 // API functions
-void
-printFrame(frame_data_t * frame_data_s, uint32_t index);
-void
-addFrame(uint64_t ID, frame_data_t * frame_data_s);
-void
-printFrames(uint64_t ID);
-void
-freeFrames(void * ptr);
-uint32_t
-checkFrames(uint64_t ID);
-uint32_t
-resetFrames(uint64_t ID);
-frame_data_t **
-getFrames(uint64_t ID);
-void
-printFrameN(frame_data_t ** frames, uint32_t frame_number);
-uint32_t
-getNFrames(frame_data_t ** frames);
-void *
-findFrame(uint64_t ID);
-void *
-newID_get(uint64_t ID);
+void            printFrame(frame_data_t * frame_data_s, uint32_t index);
+void            addFrame(uint64_t ID, frame_data_t * frame_data_s);
+void            printFrames(uint64_t ID);
+void            freeFrames(void * ptr);
+uint32_t        checkFrames(uint64_t ID);
+uint32_t        resetFrames(uint64_t ID);
+frame_data_t ** getFrames(uint64_t ID);
+void            printFrameN(frame_data_t ** frames, uint32_t frame_number);
+uint32_t        getNFrames(frame_data_t ** frames);
+void *          findFrame(uint64_t ID);
+void *          newID_get(uint64_t ID);
 #endif

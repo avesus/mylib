@@ -214,6 +214,33 @@ myBarrierInit(pthread_barrier_t * barrier,
 //////////////////////////////////////////////////////////////////////
 // C IO fd
 int32_t
+myFnctl(uint32_t      fd,
+        uint32_t      cmd,
+        uint32_t      flags,
+        const char *  fname,
+        const int32_t ln) {
+
+    int32_t ret = fcntl(fd, cmd, flags);
+    if (ret == -1) {
+        errdie("Failed to set flags for fd %d at %s:%d\n", fd, fname, ln);
+    }
+    return ret;
+}
+
+void
+make_nonblock(int32_t fd) {
+    int32_t old_flags = myfcntl(fd, F_GETFL, 0);
+    myfcntl(fd, F_SETFL, old_flags | O_NONBLOCK);
+}
+
+void
+make_blocking(int32_t fd) {
+    int32_t old_flags = myfcntl(fd, F_GETFL, 0);
+    myfcntl(fd, F_SETFL, old_flags & (~O_NONBLOCK));
+}
+
+
+int32_t
 myOpen2(const char *  path,
         int32_t       flags,
         const char *  fname,
@@ -255,6 +282,26 @@ myRead(int32_t       fd,
 }
 
 int32_t
+myRobustRead(int32_t       fd,
+              void *        buf,
+              size_t        nbytes,
+              const char *  fname,
+              const int32_t ln) {
+
+    int32_t ret;
+    ret = read(fd, buf, nbytes);
+    if (ret == (-1)) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            // maybe a short sleep here?
+            return 0;
+        }
+            errdie("Failed to write at %s:%d\n", fname, ln);
+    }
+    return ret;
+}
+
+
+int32_t
 myWrite(int32_t       fd,
         void *        buf,
         size_t        nbytes,
@@ -267,6 +314,30 @@ myWrite(int32_t       fd,
     }
     return result;
 }
+
+int32_t
+myRobustWrite(int32_t       fd,
+              void *        buf,
+              size_t        nbytes,
+              const char *  fname,
+              const int32_t ln) {
+
+    size_t  total_written = 0;
+    int32_t ret;
+    while (total_written < nbytes) {
+        ret = write(fd, buf, (nbytes - total_written));
+        if (ret == (-1)) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // maybe a short sleep here?
+                continue;
+            }
+            errdie("Failed to write at %s:%d\n", fname, ln);
+        }
+        total_written += ret;
+    }
+    return (int32_t)total_written;
+}
+
 
 //////////////////////////////////////////////////////////////////////
 // C IO fp
