@@ -33,46 +33,69 @@ Player::read(string name, string file) {
         l.character = name;
         lines.insert(l);
     }
+    ifs.clear();
+    ifs.seekg(0, ios::beg);
 }
 
 
 // recites each of the lines for this fragment number of the player
 void
 Player::act(p_info pi) {
+    fprintf(stderr, "Start Act\n");
     for (auto it = lines.begin(); it != lines.end(); it++) {
-        PRINT(HIGH_VERBOSE, "(%ld) Doing line Outside: %d[%s]: %s\n", pthread_self(),it->linen, it->character.c_str(), it->msg.c_str());
         if ((*(pi.progress_state)) == CANCELLED) {
-            die("Currently unsupported\n");
             clear_recvr_outbuf(pi.recvr);
-            p.player_exit(CANCELLED);
             break;
         }
-        p.recite(it, pi.frag_num, pi.agr_outbuf);
+        active_p->recite(it, pi.frag_num, pi.frags_left, pi.agr_outbuf);
     }
-
-    fprintf(stderr, "MARKERHIT DONE\n");
+    fprintf(stderr, "Progress: %d != %d -> %d\n", (*(pi.progress_state)), CANCELLED, (*(pi.progress_state)) != CANCELLED);
     if ((*(pi.progress_state)) != CANCELLED) {
-        (*(pi.progress_state)) = READY;
-        p.player_exit(READY);
+        active_p->player_exit(READY);
         if (__atomic_sub_fetch((pi.frags_left), 1, __ATOMIC_RELAXED) == 0) {
-            DBG_ASSERT(pi.agr_outbuf[0] == CONTENT_MSG,
+            DBG_ASSERT((*(pi.agr_outbuf))[0] == CONTENT_MSG,
                        "Error type got corrupted %d -> %d\n",
                        CONTENT_MSG,
-                       pi.agr_outbuf[0]);
+                       (*(pi.agr_outbuf))[0]);
+
+            DBG_ASSERT(pi.agr_outbuf->c_str()[0] == CONTENT_MSG,
+                       "Error type in c_str got corrupted %d -> %d\n",
+                       CONTENT_MSG,
+                       pi.agr_outbuf->c_str()[0]);
+            
             PRINT(HIGH_VERBOSE,
-                  "Preparing to write: [%ld] ->\n%s\n",
-                  HEADER_SIZE + pi.agr_outbuf.length(),
-                  pi.agr_outbuf.c_str());
+                  "STARTPREPPreparing to write(%p): [%ld] ->\n%s\nENDPREP(%p, %ld)\n",
+                  &(pi.agr_outbuf->c_str()[0]),
+                  HEADER_SIZE + pi.agr_outbuf->length(),
+                  &(pi.agr_outbuf->c_str()[0]),
+                  &(pi.agr_outbuf->c_str()[0]),
+                  HEADER_SIZE + pi.agr_outbuf->length());
 
             prepare_send_recvr(pi.recvr,
-                               HEADER_SIZE + pi.agr_outbuf.length(),
-                               (uint8_t *)pi.agr_outbuf.c_str());
+                               HEADER_SIZE + pi.agr_outbuf->length(),
+                               (uint8_t *)(&(pi.agr_outbuf->c_str()[0])));
 
             reset_recvr_event(pi.recvr, &handle_event, EV_WRITE, WRITING);
+            active_p->reset_play_state();
+            (*(pi.progress_state)) = READY;
+            delete pi.agr_outbuf;
+                myfree(pi.frags_left);
         }
+
     }
+            else {
+            clear_recvr_outbuf(pi.recvr);
+            active_p->player_exit(CANCELLED);
+            if (__atomic_sub_fetch((pi.frags_left), 1, __ATOMIC_RELAXED) == 0) {
+                active_p->reset_play_state();
+                (*(pi.progress_state)) = READY;
+                delete pi.agr_outbuf;
+                myfree(pi.frags_left);
+            }
+        }
 
 
+    fprintf(stderr, "End Act\n");
     // exit when lines are done (as if there is no more to acting
     // than reciting lines... where is the expressiveness!)
 }
@@ -81,14 +104,18 @@ Player::act(p_info pi) {
 // trying to pop parts of the que
 void
 Player::work(sync_que & q, condition_variable & cv_dir) {
-    while (!q.done) {
-        p_info p = q.pop();
-        if (q.done) {
+    while (q.done != SHUTDOWN) {
+        p_info pi = q.pop();
+        if (q.done == SHUTDOWN) {
             break;
         }
-
-        read(p.name, p.file);
-        act(p);
+        else if(q.done == CANCELLED) {
+            usleep(50);
+            continue;
+        }
+        this->active_p = pi.active_play;
+        read(pi.name, pi.file);
+        act(pi);
         cv_dir.notify_all();
     }
 }

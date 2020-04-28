@@ -19,4 +19,9 @@
 #define IS_VALID_TYPE(X) (((X) >= 1) && ((X) <= NTYPES))
 
 
+#define READY     0
+#define CANCELLED 1
+#define ONGOING   2
+
+#define SHUTDOWN 3
 #endif

@@ -157,10 +157,19 @@ arr_node_t *
 get_node_idx(arr_list_t * alist, uint32_t idx) {
     uint32_t log_init_size = alist->log_init_size;
     uint64_t x_y_idx       = get_x_y_idx(idx, log_init_size);
-    uint32_t x_idx         = get_x_idx(x_y_idx);
-    uint32_t y_idx         = get_y_idx(x_y_idx);
+
+
+    uint32_t x_idx = get_x_idx(x_y_idx);
+    uint32_t y_idx = get_y_idx(x_y_idx);
+
+    if (idx >= alist->nitems || alist->arr[x_idx] == NULL ||
+        y_idx >= X_TO_SIZE(x_idx, log_init_size)) {
+        return NULL;
+    }
 
     arr_node_t * ret_node = alist->arr[x_idx] + y_idx;
+
+#ifdef SUPER_DEBUG
     DBG_ASSERT(ret_node != NULL && ret_node->x_idx == x_idx &&
                    ret_node->y_idx == y_idx,
                "Error invalid index\n\t"
@@ -172,6 +181,7 @@ get_node_idx(arr_list_t * alist, uint32_t idx) {
                y_idx,
                ret_node->y_idx,
                idx);
+#endif
     return ret_node;
 }
 

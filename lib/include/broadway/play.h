@@ -14,6 +14,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include <helpers/util.h>
+
+#include <broadway-config.h>
 #include <broadway/line.h>
 
 using namespace std;
@@ -29,32 +32,36 @@ enum {
 
 
 class Play {
-    const vector<string> &         names;
-    vector<string>::const_iterator it;  // scene name iterator
-
-    uint32_t line_counter;            // current line in recitation
-    int32_t  scene_fragment_counter;  // current fragment
-    int32_t  on_stage;  // number of character on scene for cur fragment
-    int32_t  n_passed;  // number of players unable to do next line
-    string   cur_char;  // current character name
+    vector<string> names;
+    size_t         names_idx;
+    uint32_t       line_counter;            // current line in recitation
+    int32_t        scene_fragment_counter;  // current fragment
+    int32_t        on_stage;  // number of character on scene for cur fragment
+    int32_t        n_passed;  // number of players unable to do next line
+    string         cur_char;  // current character name
 
     mutex              m;
     condition_variable cv;
 
    public:
-    Play(const vector<string> & names)
-        : names(names),
-          it(names.begin()),
+    Play(const vector<string> & inames)
+        : names_idx(0),
           line_counter(1),
           scene_fragment_counter(0),
           on_stage(0),
-          n_passed(0) {}
+          n_passed(0) {
+        for (size_t i = 0; i < inames.size(); i++) {
+            this->names.push_back(inames[i]);
+        }
+        assert(this->names.size());
+    }
 
 
     // recites a play by coordinating playesr
     void recite(set<line>::iterator & it,
                 int32_t               expec_fragment_lines,
-                string &              agr_outbuf);
+                int32_t * volatile progress_state,
+                string * agr_outbuf);
 
 
     // reset skipped line tracker
@@ -66,10 +73,10 @@ class Play {
 
     // between scenes reset/printout scene name if possible
     void
-    reset_counter(string & agr_outbuf) {
-        if (*it != "") {
-            agr_outbuf += "\n\n";
-            agr_outbuf += *it;
+    reset_counter(string * agr_outbuf) {
+        if (this->names[names_idx] != "") {
+            (*agr_outbuf) += "\n\n";
+            (*agr_outbuf) += this->names[names_idx];
         }
 
         this->line_counter = 1;
@@ -81,8 +88,14 @@ class Play {
     get_on_stage() {
         return on_stage;
     }
-
-
+    void
+    reset_play_state() {
+        this->names_idx              = 0;
+        this->line_counter           = 1;
+        this->scene_fragment_counter = 0;
+        this->on_stage               = 0;
+        this->n_passed               = 0;
+    }
     // check if ready to start a given scene
     int
     enter(int32_t frag) {
@@ -104,10 +117,7 @@ class Play {
         lock_guard<mutex> l(m);
 
         if (cancelled) {
-            line_counter           = 1;
-            scene_fragment_counter = 0;
-            on_stage               = 0;
-            n_passed               = 0;
+            this->reset_play_state();
             return "";
         }
 
@@ -135,9 +145,9 @@ class Play {
         // output cleanliness)
         else if (on_stage == 0) {
             scene_fragment_counter++;
-            if (it != names.end()) {
+            if (this->names_idx != names.size()) {
                 ret_buf += "\n\n\n";
-                it++;
+                this->names_idx++;
                 cv.notify_all();
             }
         }

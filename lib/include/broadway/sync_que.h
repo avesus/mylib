@@ -11,21 +11,27 @@
 
 #include <helpers/opt.h>
 
+#include <broadway-config.h>
+#include <broadway/play.h>
+
 #include <IO/receiver.h>
+
+
 
 using namespace std;
 
 // the type that lets a worker who pops item get enough info to read
 // the file/start reciting
 struct p_info {
-    string       name;
-    size_t       frag_num;
-    string       file;
-    string &     agr_outbuf;
-    receiver_t * recvr;
+    string           name;
+    size_t           frag_num;
+    string           file;
+    shared_ptr<Play> active_play;
+    string *         agr_outbuf;
+    receiver_t *     recvr;
     int32_t * volatile frags_left;
     int32_t * volatile progress_state;
-    p_info(string & in_outbuf) : agr_outbuf(in_outbuf) {}
+    p_info() {}
 };
 
 
@@ -39,6 +45,7 @@ class sync_que {
     condition_variable cv;
     volatile uint64_t  done = 0;
     void               push(p_info p);
+    void               clear();
     p_info             pop();
 
     size_t

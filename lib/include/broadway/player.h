@@ -13,11 +13,6 @@
 #include <IO-config.h>
 #include <IO/receiver.h>
 
-#define READY     0
-#define CANCELLED 1
-#define ONGOING 2
-
-
 using namespace std;
 
 class Play;
@@ -26,14 +21,14 @@ class Play;
 /* Player class that actually stores the lines for each character and
    is coordinated by play class */
 class Player {
-    string    name;
-    set<line> lines;
-    Play &    p;
-    ifstream  ifs;
-    thread    t;
+    string           name;
+    set<line>        lines;
+    shared_ptr<Play> active_p;
+    ifstream         ifs;
+    thread           t;
 
    public:
-    Player(Play & p) : p(p) {}
+    Player() {}
 
     void read(string name, string file);
 

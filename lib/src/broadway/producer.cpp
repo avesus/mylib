@@ -6,6 +6,35 @@
 #define USR_DATA_PTR(X) ((io_data *)low_bits_get_ptr((X)))
 
 static void
+my_sigint_handler(const int fd, const short which, void * arg) {
+    PRINT(LOW_VERBOSE, "Handling SIGINT\n");
+    producer *   this_producer = (producer *)arg;
+    this_producer->~producer();
+}
+
+static void
+send_data(receiver_t * recvr, TYPE_TYPE type, HEADER_TYPE hdr, char * data) {
+
+    // assume header == 0 means needs to set header
+    if (hdr == 0) {
+        hdr = HEADER_SIZE + TYPE_SIZE + strlen(data);
+    }
+
+    DBG_ASSERT(IS_VALID_TYPE(type), "Error invalid type: %d\n", type);
+
+    PRINT(LOW_VERBOSE, "writing: %s\n", data);
+    store_recvr_outbuf(recvr, (uint8_t *)(&hdr), HEADER_SIZE, ACQUIRE);
+    store_recvr_outbuf(recvr, (uint8_t *)(&type), TYPE_SIZE, 0);
+    store_recvr_outbuf(recvr,
+                       (uint8_t *)data,
+                       (hdr - (HEADER_SIZE + TYPE_SIZE)),
+                       RELEASE);
+
+    reset_recvr_event(recvr, &handle_event, EV_WRITE, WRITING);
+}
+
+
+static void
 send_type(receiver_t * recvr, TYPE_TYPE type) {
     HEADER_TYPE hdr = HEADER_SIZE + TYPE_SIZE;
 
@@ -46,22 +75,31 @@ handle_net_cmd(void * arg, io_data * data_buf) {
     }
     else if (type == CONTENT_MSG) {
         fprintf(stderr,
-                "Received play content!\n\"%s\"\n",
+                "Received Play Content!\n\"%s\"\n",
                 (char *)(&(data_buf->data[DATA_START_IDX])));
         // request to state a given play
         send_type(recvr, AVAIL_MSG);
+        myfree(data_buf);
     }
     else if (type == CONTROL_MSG) {
-        // not control stuff now..
-        die("CONTROL_MSG not supported yet\n");
+
+        // director is requesting a ping
+        fprintf(stderr,
+                "Director Send Non-Content Response: \n\"%s\"\n",
+                (char *)(&(data_buf->data[DATA_START_IDX])));
+        myfree(data_buf);
     }
     else {
-        die("Error this should absolutely never happen\n");
+        die("This is impossible...\n");
     }
 
     return NULL;
 }
 
+#define RETURN_CMD                                                             \
+    stdin_recvr->amt_read = 0;                                                 \
+    stdin_recvr->rd_state = READING_NONE;                                      \
+    return NULL;
 
 static void *
 handle_stdin_cmd(void * arg, io_data * data_buf) {
@@ -71,20 +109,25 @@ handle_stdin_cmd(void * arg, io_data * data_buf) {
     char * str_buf = (char *)stdin_recvr->buf;
     // drop the newline
     str_buf[stdin_recvr->amt_read - 1] = 0;
+
     if (!strcmp(str_buf, "exit")) {
         this_producer->~producer();
-        return NULL;
+        RETURN_CMD;
     }
-    else if (!strncmp(str_buf, "kill", strlen("kill"))) {
-        char *   end     = str_buf + strlen("kill") + 1;
-        uint32_t dir_idx = strtol(str_buf + strlen("kill") + 1, &end, 10);
-        if (end == str_buf + strlen("kill") + 1) {
+    else if (!strncmp(str_buf, "quit", strlen("quit"))) {
+        char *   end     = str_buf + strlen("quit") + 1;
+        uint32_t dir_idx = strtol(str_buf + strlen("quit") + 1, &end, 10);
+        if (end == str_buf + strlen("quit") + 1) {
             fprintf(stderr, "Invalid command \"%s\"\n", str_buf);
-            return NULL;
+            RETURN_CMD;
         }
         else {
             arr_node_t * dir_node =
                 get_node_idx(this_producer->director_list, dir_idx);
+            if (dir_node == NULL) {
+                fprintf(stderr, "Director index %d does not exist!\n", dir_idx);
+                RETURN_CMD;
+            }
             receiver_t * recvr = (receiver_t *)(dir_node->usr_key);
 
             // director response handler will actually clean up the
@@ -94,29 +137,71 @@ handle_stdin_cmd(void * arg, io_data * data_buf) {
     }
     else if (!strncmp(str_buf, "play", strlen("play"))) {
         uint32_t dir_idx;
-        char     play_name[SMALL_BUF_LEN];
+        char     play_name[MED_BUF_LEN];
         if (sscanf(str_buf + strlen("play") + 1,
                    "%d %s\n",
                    &dir_idx,
                    play_name) != 2) {
             fprintf(stderr, "Invalid command \"%s\"\n", str_buf);
-            return NULL;
+            RETURN_CMD;
+        }
+        arr_node_t * dir_node =
+            get_node_idx(this_producer->director_list, dir_idx);
+
+        if (dir_node == NULL) {
+            fprintf(stderr, "Director index %d does not exist!\n", dir_idx);
+            RETURN_CMD;
+        }
+
+        receiver_t * recvr = (receiver_t *)(dir_node->usr_key);
+
+        send_data(recvr,
+                  CONTENT_MSG,
+                  strlen(play_name) + HEADER_SIZE + TYPE_SIZE,
+                  play_name);
+    }
+    else if (!strncmp(str_buf, "show", strlen("show"))) {
+        char *   end     = str_buf + strlen("show") + 1;
+        uint32_t dir_idx = strtol(str_buf + strlen("show") + 1, &end, 10);
+        if (end == str_buf + strlen("show") + 1) {
+            fprintf(stderr, "Invalid command \"%s\"\n", str_buf);
+            RETURN_CMD;
         }
 
         arr_node_t * dir_node =
             get_node_idx(this_producer->director_list, dir_idx);
+        if (dir_node == NULL) {
+            fprintf(stderr, "Director index %d does not exist!\n", dir_idx);
+            RETURN_CMD;
+        }
         receiver_t * recvr = (receiver_t *)(dir_node->usr_key);
 
-        send_type(recvr, CONTENT_MSG);
+        send_type(recvr, AVAIL_MSG);
+    }
+    else if (!strncmp(str_buf, "cancel", strlen("cancel"))) {
+        char *   end     = str_buf + strlen("cancel") + 1;
+        uint32_t dir_idx = strtol(str_buf + strlen("cancel") + 1, &end, 10);
+        if (end == str_buf + strlen("cancel") + 1) {
+            fprintf(stderr, "Invalid command \"%s\"\n", str_buf);
+            RETURN_CMD;
+        }
+
+        arr_node_t * dir_node =
+            get_node_idx(this_producer->director_list, dir_idx);
+
+        if (dir_node == NULL) {
+            fprintf(stderr, "Director index %d does not exist!\n", dir_idx);
+            RETURN_CMD;
+        }
+        receiver_t * recvr = (receiver_t *)(dir_node->usr_key);
+        send_type(recvr, CONTROL_MSG);
     }
     else {
         fprintf(stderr, "Invalid command \"%s\"\n", str_buf);
     }
 
 
-    stdin_recvr->amt_read = 0;
-    stdin_recvr->rd_state = READING_NONE;
-    return NULL;
+    RETURN_CMD;
 }
 
 static void
@@ -151,6 +236,7 @@ link_new_recvr(void * me, receiver_t * recvr) {
 
 
 producer::producer(uint32_t min_threads, char * _ip_addr, int32_t _portno) {
+
     if (evthread_use_pthreads() == (-1)) {
         errdie("Couldn't initialize event thread type\n");
     }
@@ -164,6 +250,7 @@ producer::producer(uint32_t min_threads, char * _ip_addr, int32_t _portno) {
                                  ip_addr,
                                  portno,
                                  (void *)this,
+                                 &my_sigint_handler,
                                  &link_new_recvr);
 
     this->stdin_recvr = init_stdin_recvr(0,
@@ -180,9 +267,9 @@ producer::~producer() {
 
     // free accptr here will be whats responsible for killing all directory
     // connections. Kind of needs to be accptr->io_thread->recvr to avoid
-    // concurrency bugs (i.e all events need to be shut down before the recvr
-    // can be freed from producer end as nothing is inherently stopping the
-    // director from sending back data at same time)
+    // concurrency bugs (i.e all events need to be shut down before the
+    // recvr can be freed from producer end as nothing is inherently
+    // stopping the director from sending back data at same time)
     free_accptr(this->accptr);
     free_alist(this->director_list);
 }
@@ -220,10 +307,22 @@ producer::kill_all_directors() {
           this->active_directors,
           this->director_list->ll);
 
-    while (__atomic_load_n(&(this->director_list->ll), __ATOMIC_RELAXED)) {
+    arr_node_t * temp = NULL;
+    while (1) {
+        temp = __atomic_load_n(&(this->director_list->ll), __ATOMIC_RELAXED);
+        if (temp == NULL) {
+            break;
+        }
         // the node will be removed in director response
-        receiver_t * recvr = (receiver_t *)this->director_list->ll->usr_key;
+        receiver_t * recvr = (receiver_t *)temp->usr_key;
         send_type(recvr, KILL_MSG);
+
+        // ack from the director will cause node removal so temp wont == l
+        while (__atomic_load_n(&(this->director_list->ll), __ATOMIC_RELAXED) ==
+               temp) {
+            // short sleep time so responsive but not too cpu intensive
+            do_sleep;
+        }
     }
     // kill all directors then wait...
     uint32_t iter = 0;

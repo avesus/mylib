@@ -1,5 +1,14 @@
 #include <IO/acceptor.h>
 
+static void
+default_sigint_handler(const int32_t sig) {
+    DBG_ASSERT(
+        sig == SIGINT,
+        "Error sigint somehow called without SIGINT...\nClearly I messed up\n");
+
+    fprintf(stderr, "SIGINT handler evoked\n");
+    exit(0);
+}
 
 static int32_t
 prep_accptr_socket(char * ip_addr, uint32_t portno) {
@@ -144,16 +153,22 @@ do_accept(const int fd, const short which, void * arg) {
 void
 free_accptr(acceptor_t * accptr) {
     pthread_mutex_lock(&(accptr->m));
-    PRINT(MED_VERBOSE,
-          "Exitting acceptor\n");
+
+    if (event_del(&(accptr->accptr_ev)) == -1) {
+        errdie("Couldn't delete acceptor event\n");
+    }
+
+    PRINT(MED_VERBOSE, "Exitting acceptor\n");
     if (event_base_loopbreak(accptr->accptr_base) == (-1)) {
         errdie("Couldn't cancel acceptor event loop. This is unrecoverable\n");
     }
 
     close(accptr->accept_fd);
-    
+
     uint64_t avail_mask = accptr->avail_threads;
     uint64_t avail_idx;
+
+    // free all active threads
     while (avail_mask) {
         ff1_asm_tz(avail_mask, avail_idx);
         avail_mask ^= ((1UL) << avail_idx);
@@ -166,11 +181,13 @@ free_accptr(acceptor_t * accptr) {
 
 
 acceptor_t *
-init_acceptor(uint32_t   init_nthreads,
-              char *     ip_addr,
-              uint32_t   portno,
-              void *     owner,
-              owner_init init) {
+init_acceptor(uint32_t    init_nthreads,
+              char *      ip_addr,
+              uint32_t    portno,
+              void *      owner,
+              sig_handler custum_sigint_handler,
+              owner_init  init) {
+
 
     acceptor_t * new_accptr = (acceptor_t *)mycalloc(1, sizeof(acceptor_t));
 
@@ -178,6 +195,7 @@ init_acceptor(uint32_t   init_nthreads,
     if (new_accptr->accptr_base == NULL) {
         errdie("Couldn't initialize acceptor event base\n");
     }
+
 
     new_accptr->my_owner = owner;
     new_accptr->init     = init;
@@ -201,9 +219,27 @@ init_acceptor(uint32_t   init_nthreads,
     make_nonblock(accept_fd);
     new_accptr->accept_fd = accept_fd;
 
+    // this is off. Basically this is just a lightweight way for me to grab
+    // symbols when trying to debu a data race that GDB's slowdown will hide.
     NEW_FRAME(FMTS("%p", "%d", "%d"),
               VARS(new_accptr, new_accptr->nthreads, new_accptr->accept_fd));
 
+    if (owner != NULL && custum_sigint_handler != NULL) {
+
+        event_set(&(new_accptr->sigint_ev),
+                  SIGINT,
+                  EV_SIGNAL,
+                  custum_sigint_handler,
+                  (void *)owner);
+
+        event_base_set(new_accptr->accptr_base, &(new_accptr->sigint_ev));
+        if (event_add(&(new_accptr->sigint_ev), NULL) == (-1)) {
+            errdie("Unable to add acceptor event\n");
+        }
+    }
+    else {
+        signal(SIGINT, default_sigint_handler);
+    }
 
     event_set(&(new_accptr->accptr_ev),
               accept_fd,
