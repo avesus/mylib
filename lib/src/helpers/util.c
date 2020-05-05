@@ -72,7 +72,7 @@ dieOnErrno(const char * fn,
            ...) {
     va_list ap;
     va_start(ap, msg);
-    fprintf(stderr, "%s:%d: ID(%lu)", fn, ln, ID);
+    fprintf(stderr, "%s:%s:%d: ID(%lu) ", progname, fn, ln, ID);
     vfprintf(stderr, msg, ap);  // NOLINT /* This warning is a clang-tidy bug */
     va_end(ap);
     fprintf(stderr, "\t%d:%s\n", en, strerror(en));
@@ -87,10 +87,10 @@ dieOnErrno(const char * fn,
 
 
 void
-die(const char * fmt, ...) {
+_die(const char * fn, int32_t ln, const char * fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    fprintf(stderr, "%s: ", progname);
+    fprintf(stderr, "%s:%s:%d ", progname, fn, ln);
     vfprintf(stderr, fmt, ap);  // NOLINT /* This warning is a clang-tidy bug */
     va_end(ap);
     fprintf(stderr, "\n");
@@ -103,6 +103,40 @@ die(const char * fmt, ...) {
     PRINT_FRAMES;
     exit(-1);
 }
+
+//////////////////////////////////////////////////////////////////////
+//VM alloc stuff
+void *
+myMmap(void *        addr,
+       uint64_t      length,
+       int32_t       prot_flags,
+       int32_t       mmap_flags,
+       int32_t       fd,
+       int32_t       offset,
+       const char *  fname,
+       const int32_t ln) {
+
+    void * p = mmap(addr, length, prot_flags, mmap_flags, fd, offset);
+    if (p == MAP_FAILED && length) {
+        errdie("Failed mmap at %s:%d\n", fname, ln);
+    }
+    return p;
+}
+
+
+void
+myMunmap(void * addr, uint64_t length, const char * fname, const int32_t ln) {
+    if(addr && length) {
+        if ((((uint64_t)addr) % PAGE_SIZE) != 0) {
+            die("Invalid address to unmap (%p) at %s:%d", addr, fname, ln);
+        }
+
+        if (munmap(addr, length) == -1) {
+            errdie("Failed to unmap memory at %s:%d", fname, ln);
+        }
+    }
+}
+
 
 //////////////////////////////////////////////////////////////////////
 // alloc stuff
@@ -149,6 +183,7 @@ myACalloc(size_t        alignment,
     }
 
     memset(p, 0, nmemb * size);
+    
     return p;
 }
 
@@ -392,7 +427,7 @@ dblcomp(const void * a, const void * b) {
 double
 getMedian(uint64_t * arr, uint32_t len) {
     if (len == 0 || arr == NULL) {
-        errdie("Bad len or array: %p[%d]\n", arr, len);
+        die("Bad len or array: %p[%d]\n", arr, len);
     }
     double * arr_dbl = (double *)mycalloc(len, sizeof(double));
     for (uint32_t i = 0; i < len; i++) {
@@ -414,7 +449,7 @@ getMedian(uint64_t * arr, uint32_t len) {
 double
 getMean(uint64_t * arr, uint32_t len) {
     if (len == 0 || arr == NULL) {
-        errdie("Bad len or array: %p[%d]\n", arr, len);
+        die("Bad len or array: %p[%d]\n", arr, len);
     }
     double total = 0.0;
     for (uint32_t i = 0; i < len; i++) {
@@ -426,7 +461,7 @@ getMean(uint64_t * arr, uint32_t len) {
 double
 getSD(uint64_t * arr, uint32_t len) {
     if (len == 0 || arr == NULL) {
-        errdie("Bad len or array: %p[%d]\n", arr, len);
+        die("Bad len or array: %p[%d]\n", arr, len);
     }
     if (len == 1) {
         return 0.0;
@@ -447,7 +482,7 @@ getSD(uint64_t * arr, uint32_t len) {
 double
 getVar(uint64_t * arr, uint32_t len) {
     if (len == 0 || arr == NULL) {
-        errdie("Bad len or array: %p[%d]\n", arr, len);
+        die("Bad len or array: %p[%d]\n", arr, len);
     }
     double sum = 0.0;
     double mean;
@@ -467,7 +502,7 @@ getVar(uint64_t * arr, uint32_t len) {
 double
 getMin(uint64_t * arr, uint32_t len) {
     if (len == 0 || arr == NULL) {
-        errdie("Bad len or array: %p[%d]\n", arr, len);
+        die("Bad len or array: %p[%d]\n", arr, len);
     }
     double m = arr[0];
     for (uint32_t i = 0; i < len; i++)
@@ -482,7 +517,7 @@ getMin(uint64_t * arr, uint32_t len) {
 double
 getMax(uint64_t * arr, uint32_t len) {
     if (len == 0 || arr == NULL) {
-        errdie("Bad len or array: %p[%d]\n", arr, len);
+        die("Bad len or array: %p[%d]\n", arr, len);
     }
     double m = arr[0];
     for (uint32_t i = 0; i < len; i++)
@@ -512,7 +547,7 @@ to_usecs(struct timespec t) {
 
 uint64_t
 us_diff(struct timespec t1, struct timespec t2) {
-    return (to_usecs(t1) - to_usecs(t2));
+    return ns_diff(t1, t2) / (unit_change);
 }
 
 
@@ -523,7 +558,7 @@ to_msecs(struct timespec t) {
 
 uint64_t
 ms_diff(struct timespec t1, struct timespec t2) {
-    return (to_msecs(t1) - to_msecs(t2));
+    return ns_diff(t1, t2) / (unit_change * unit_change);
 }
 
 
@@ -534,7 +569,7 @@ to_secs(struct timespec t) {
 
 uint64_t
 s_diff(struct timespec t1, struct timespec t2) {
-    return (to_secs(t1) - to_secs(t2));
+    return ns_diff(t1, t2) / (unit_change * unit_change * unit_change);
 }
 
 double

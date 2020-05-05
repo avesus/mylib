@@ -4,9 +4,15 @@
 #if __has_include(<compile-config.h>)
 #include <compile-config.h>
 #endif
+
 #ifndef NCORES
 #define NCORES ((uint64_t)sysconf(_SC_NPROCESSORS_ONLN))
 #endif
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE ((uint64_t)sysconf(_SC_PAGE_SIZE))
+#endif
+
 #ifndef L1_CACHE_LINE_SIZE
 #ifdef L1_LOG_CACHE_LINE_SIZE
 #error "No idea how log(cache line size) was created w/o cache line size..."

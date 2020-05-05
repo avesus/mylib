@@ -8,6 +8,7 @@ $(shell mkdir -p bin)
 all:
 
 ifneq ($(WITH_CONSTANTS), 0)
+	rm -f $(COMPILE_CONF_FILE)
 	(make -C lib/ BASE_DIR=${CURDIR} ODIR=$(OBJ_DIR))
 	(make -C module/ BASE_DIR=${CURDIR} ODIR=$(OBJ_DIR) OFILE=$(COMPILE_CONF_FILE))
 endif
