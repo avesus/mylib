@@ -15,8 +15,10 @@
 
 #ifndef L1_CACHE_LINE_SIZE
 #ifdef L1_LOG_CACHE_LINE_SIZE
+
 #error "No idea how log(cache line size) was created w/o cache line size..."
 BROKEN //this is just to cause compiler error
+
 #endif
 #define L1_CACHE_LINE_SIZE 64
 #define L1_LOG_CACHE_LINE_SIZE 6
@@ -59,6 +61,14 @@ extern int32_t verbose;
 #define BIG_BUF_LEN 512
 
 
-#define NORMAL_ALIGNMENT
-#define ptype ms //unit for timing output
+#define ptype ms //default unit for timing output
+
+
+// gcc has typeof, c++ equivilent is decltype
+#ifdef __cpp_attributes
+#define CPP_MODE
+#else
+#define C_MODE
+#endif
+
 #endif

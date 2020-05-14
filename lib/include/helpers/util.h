@@ -3,7 +3,6 @@
 
 
 #include <assert.h>
-#include <sys/mman.h>
 #include <dirent.h>
 #include <errno.h>
 #include <execinfo.h>
@@ -19,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
@@ -81,6 +81,15 @@ void _die(const char * fn, int32_t ln, const char * fmt, ...);
 // vm alloc wrappers
 #define mymmap(A, B, C, D, E, F)                                               \
     myMmap((A), (B), (C), (D), (E), (F), __FILE__, __LINE__)
+void * myMmap(void *        addr,
+              uint64_t      length,
+              int32_t       prot_flags,
+              int32_t       mmap_flags,
+              int32_t       fd,
+              int32_t       offset,
+              const char *  fname,
+              const int32_t ln);
+
 
 // allocation with mmap
 #define mymmap_alloc(X)                                                        \
@@ -105,6 +114,10 @@ void _die(const char * fn, int32_t ln, const char * fmt, ...);
            __LINE__)
 
 #define mymunmap(X, Y) myMunmap((X), (Y), __FILE__, __LINE__)
+void myMunmap(void *        addr,
+              uint64_t      length,
+              const char *  fname,
+              const int32_t ln);
 
 // alloc wrappers
 #define mycalloc(x, y) myCalloc((x), (y), __FILE__, __LINE__)
@@ -279,28 +292,7 @@ const char * unit_to_str(enum time_unit u);
 #define sizeof_bits(X) ((sizeof(X)) << 3)
 
 
-typedef union four_byte_cast {
-    uint32_t ui;
-    int32_t  i;
-    float    f;
-} fb_cast;
-
-typedef union eight_byte_cast {
-    void *   p;
-    void **  pp;
-    uint64_t ui;
-    int64_t  i;
-    double   d;
-} eb_cast;
-
-#define byte_f_to_i(X) ((fb_cast)(X)).i
-#define byte_d_to_i(X) ((eb_cast)(X)).i
-#define byte_i_to_f(X) ((fb_cast)(X)).f
-#define byte_i_to_d(X) ((fb_cast)(X)).d
-
-
 // For generating macros
-
 #define COMBINE_(X, Y) X##Y
 #define COMBINE(X, Y)  COMBINE_(X, Y)
 

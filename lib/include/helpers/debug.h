@@ -41,8 +41,8 @@ typedef struct frame_data {
 #define META_DATA_SIZE offsetof(frame_data_t, data)
 
 
-#define ALIGNMENT      sizeof(uint64_t)  // for now this should be enough
-#define ALIGNMENT_MASK (ALIGNMENT - 1)   // Mask of above
+#define DBG_ALIGNMENT      sizeof(uint64_t)     // for now this should be enough
+#define DBG_ALIGNMENT_MASK (DBG_ALIGNMENT - 1)  // Mask of above
 
 
 // helper to determine if it is var or region argument. A by-product of
@@ -91,11 +91,11 @@ typedef struct frame_data {
 #define CREATE_BUFFER(ln, X) mycalloc((X + META_DATA_SIZE), sizeof(char));
 
 // rounds up a size.
-#define ROUNDUP_AL(X) (((X) + (ALIGNMENT_MASK)) & (~(ALIGNMENT_MASK)))
+#define ROUNDUP_AL(X) (((X) + (DBG_ALIGNMENT_MASK)) & (~(DBG_ALIGNMENT_MASK)))
 
-// for aligning so that data types are on ALIGNMENT byte boundary (can be
+// for aligning so that data types are on DBG_ALIGNMENT byte boundary (can be
 // important in some cases)
-#define ALIGN(X) (ALIGNMENT - ((X) & (ALIGNMENT_MASK)));
+#define ALIGN(X) (DBG_ALIGNMENT - ((X) & (DBG_ALIGNMENT_MASK)));
 
 // for getting block size from
 #define MALLOC_SIZE_MASK (~(15UL))
@@ -130,19 +130,19 @@ typedef struct frame_data {
 
 
 // gcc has typeof, c++ equivilent is decltype
-#ifdef __cpp_attributes
+#ifdef CPP_MODE
 
-    // copy variable
-    #define DEF_TO_COPY_VAL(X, Y, Z)                                           \
-        *(decltype(Y) *)(X) = (Y);                                             \
-        (X) += ROUNDUP_AL(Z)
+// copy variable
+#define DEF_TO_COPY_VAL(X, Y, Z)                                               \
+    *(decltype(Y) *)(X) = (Y);                                                 \
+    (X) += ROUNDUP_AL(Z)
 
-#else
+#elif defined C_MODE
 
-    // copy variable
-    #define DEF_TO_COPY_VAL(X, Y, Z)                                           \
-        *(typeof(Y) *)(X) = (Y);                                               \
-        (X) += ROUNDUP_AL(Z)
+// copy variable
+#define DEF_TO_COPY_VAL(X, Y, Z)                                               \
+    *(typeof(Y) *)(X) = (Y);                                                   \
+    (X) += ROUNDUP_AL(Z)
 
 
 #endif
@@ -201,12 +201,12 @@ typedef struct frame_data {
                                         VAR_LEN + NAME_LEN + META_DATA_SIZE +  \
                                         SIZE_ALIGN + DATA_ALIGN + SIZE_LEN;    \
                                                                                \
-            DBG_ASSERT((TOTAL_SIZE % ALIGNMENT) == 0,                          \
+            DBG_ASSERT((TOTAL_SIZE % DBG_ALIGNMENT) == 0,                      \
                        "Unaligned Size (%d)\n",                                \
                        TOTAL_SIZE);                                            \
                                                                                \
-            uint8_t * BUF_PTR = NULL;                                             \
-            node * ID_NODE = (node *)findFrame(IDN);                           \
+            uint8_t * BUF_PTR = NULL;                                          \
+            node *    ID_NODE = (node *)findFrame(IDN);                        \
             if (!ID_NODE) {                                                    \
                 ID_NODE = (node *)newID_get(IDN);                              \
             }                                                                  \
@@ -227,10 +227,10 @@ typedef struct frame_data {
                                                                                \
             if (ID_STRUCT[FRAME_INDEX] && 0 &&                                 \
                 (BLOCK_SIZE(ID_STRUCT[FRAME_INDEX]) >= TOTAL_SIZE)) {          \
-                BUF_PTR = (uint8_t *)ID_STRUCT[FRAME_INDEX];                      \
+                BUF_PTR = (uint8_t *)ID_STRUCT[FRAME_INDEX];                   \
             }                                                                  \
             else {                                                             \
-                BUF_PTR = (uint8_t *)CREATE_BUFFER(ln, TOTAL_SIZE);     \
+                BUF_PTR = (uint8_t *)CREATE_BUFFER(ln, TOTAL_SIZE);            \
                 myfree(ID_STRUCT[FRAME_INDEX]);                                \
                 ID_STRUCT[FRAME_INDEX] = (frame_data_t *)BUF_PTR;              \
             }                                                                  \
@@ -280,57 +280,57 @@ typedef struct frame_data {
 
 #ifdef FRAME_DEBUGGER
 
-    // Init/deinit functions
-    #define INIT_DEBUGGER init_debugger()
-    #define FREE_DEBUGGER free_debugger()
+// Init/deinit functions
+#define INIT_DEBUGGER init_debugger()
+#define FREE_DEBUGGER free_debugger()
 
 
-    #define PRINT_FRAME_N(FRAMES, N) printFrameN(FRAMES, N)
-    #define GET_NFRAMES(FRAMES)      getNFrames(FRAMES)
+#define PRINT_FRAME_N(FRAMES, N) printFrameN(FRAMES, N)
+#define GET_NFRAMES(FRAMES)      getNFrames(FRAMES)
 
-    #define PRINT_FRAMES printFrames(pthread_self())
-    #define GET_FRAMES   getFrames(pthread_self())
-    #define HAS_FRAMES   checkFrames(pthread_self())
-    #define RESET_FRAMES resetFrames(pthread_self())
-    #define NEW_FRAME(F, V)                                                    \
-        FRAME_AT_POINT(__FILE__,                                               \
-                       __func__,                                               \
-                       __LINE__,                                               \
-                       pthread_self(),                                         \
-                       FMTS(F),                                                \
-                       VARS(COND_WRAPPER(V)));
+#define PRINT_FRAMES printFrames(pthread_self())
+#define GET_FRAMES   getFrames(pthread_self())
+#define HAS_FRAMES   checkFrames(pthread_self())
+#define RESET_FRAMES resetFrames(pthread_self())
+#define NEW_FRAME(F, V)                                                        \
+    FRAME_AT_POINT(__FILE__,                                                   \
+                   __func__,                                                   \
+                   __LINE__,                                                   \
+                   pthread_self(),                                             \
+                   FMTS(F),                                                    \
+                   VARS(COND_WRAPPER(V)));
 
-    #define PRINT_FRAMES_ID(ID) printFrames(ID)
-    #define GET_FRAMES_ID(ID)   getFrames(ID)
-    #define HAS_FRAMES_ID(ID)   checkFrames(ID)
-    #define RESET_FRAMES_ID(ID) resetFrames(ID)
-    #define NEW_FRAME_ID(ID, F, V)                                             \
-        FRAME_AT_POINT(__FILE__,                                               \
-                       __func__,                                               \
-                       __LINE__,                                               \
-                       ID,                                                     \
-                       FMTS(F),                                                \
-                       VARS(COND_WRAPPER(V)));
+#define PRINT_FRAMES_ID(ID) printFrames(ID)
+#define GET_FRAMES_ID(ID)   getFrames(ID)
+#define HAS_FRAMES_ID(ID)   checkFrames(ID)
+#define RESET_FRAMES_ID(ID) resetFrames(ID)
+#define NEW_FRAME_ID(ID, F, V)                                                 \
+    FRAME_AT_POINT(__FILE__,                                                   \
+                   __func__,                                                   \
+                   __LINE__,                                                   \
+                   ID,                                                         \
+                   FMTS(F),                                                    \
+                   VARS(COND_WRAPPER(V)));
 #else
 
-    #define INIT_DEBUGGER
-    #define FREE_DEBUGGER
+#define INIT_DEBUGGER
+#define FREE_DEBUGGER
 
-    #define PRINT_FRAME_N(FRAMES, N)
-    #define GET_NFRAMES(FRAMES) 0
+#define PRINT_FRAME_N(FRAMES, N)
+#define GET_NFRAMES(FRAMES) 0
 
-    #define PRINT_FRAMES
-    #define GET_FRAMES
-    #define HAS_FRAMES   0
-    #define RESET_FRAMES 0
-    #define NEW_FRAME(F, V)
+#define PRINT_FRAMES
+#define GET_FRAMES
+#define HAS_FRAMES   0
+#define RESET_FRAMES 0
+#define NEW_FRAME(F, V)
 
 
-    #define PRINT_FRAMES_ID(ID)
-    #define GET_FRAMES_ID(ID)
-    #define HAS_FRAMES_ID(ID)   0
-    #define RESET_FRAMES_ID(ID) 0
-    #define NEW_FRAME_ID(ID, F, V)
+#define PRINT_FRAMES_ID(ID)
+#define GET_FRAMES_ID(ID)
+#define HAS_FRAMES_ID(ID)   0
+#define RESET_FRAMES_ID(ID) 0
+#define NEW_FRAME_ID(ID, F, V)
 
 #endif
 

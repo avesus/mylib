@@ -1,13 +1,14 @@
 #include "driver.h"
 
 int32_t verbose = 0;
-
+int32_t rseed   = 0;
 
 // clang-format off
 #define Version "0.1"
 static ArgOption args[] = {
   // Kind,        Method,		name,	    reqd,  variable,		help
   { KindOption,   Integer, 		"-v", 	    0,     &verbose, 		"Set verbosity level" },
+  { KindOption,   Integer, 		"--seed", 	0,     &rseed,  		"Set random number seed" },
   { KindHelp,     Help, 	"-h" },
   { KindEnd }
 };
@@ -15,20 +16,24 @@ static ArgOption args[] = {
 
 static ArgDefs argp = { args, "Main", Version, NULL };
 
-
 int
 main(int argc, char ** argv) {
-	srand(argc);
-	INIT_DEBUGGER;
-	progname = argv[0];
+    progname = argv[0];
 
-	ArgParser * ap = createArgumentParser(&argp);
-	if (parseArguments(ap, argc, argv)) {
-		errdie("Error parsing arguments");
-	}
-	freeCommandLine();
-	freeArgumentParser(ap);
+    srand(rseed);
+    srandom(rseed);
 
-	FREE_DEBUGGER;
-	return 0;
+    INIT_DEBUGGER;
+
+    ArgParser * ap = createArgumentParser(&argp);
+    if (parseArguments(ap, argc, argv)) {
+        die("Error parsing arguments");
+    }
+    freeCommandLine();
+    freeArgumentParser(ap);
+
+    // code goes here
+
+    FREE_DEBUGGER;
+    return 0;
 }

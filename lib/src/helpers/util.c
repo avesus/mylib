@@ -105,7 +105,7 @@ _die(const char * fn, int32_t ln, const char * fmt, ...) {
 }
 
 //////////////////////////////////////////////////////////////////////
-//VM alloc stuff
+// VM alloc stuff
 void *
 myMmap(void *        addr,
        uint64_t      length,
@@ -126,7 +126,7 @@ myMmap(void *        addr,
 
 void
 myMunmap(void * addr, uint64_t length, const char * fname, const int32_t ln) {
-    if(addr && length) {
+    if (addr && length) {
         if ((((uint64_t)addr) % PAGE_SIZE) != 0) {
             die("Invalid address to unmap (%p) at %s:%d", addr, fname, ln);
         }
@@ -183,7 +183,7 @@ myACalloc(size_t        alignment,
     }
 
     memset(p, 0, nmemb * size);
-    
+
     return p;
 }
 
@@ -318,10 +318,10 @@ myRead(int32_t       fd,
 
 int32_t
 myRobustRead(int32_t       fd,
-              void *        buf,
-              size_t        nbytes,
-              const char *  fname,
-              const int32_t ln) {
+             void *        buf,
+             size_t        nbytes,
+             const char *  fname,
+             const int32_t ln) {
 
     int32_t ret;
     ret = read(fd, buf, nbytes);
@@ -330,7 +330,7 @@ myRobustRead(int32_t       fd,
             // maybe a short sleep here?
             return 0;
         }
-            errdie("Failed to write at %s:%d\n", fname, ln);
+        errdie("Failed to write at %s:%d\n", fname, ln);
     }
     return ret;
 }

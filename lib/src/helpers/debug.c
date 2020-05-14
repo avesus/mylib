@@ -196,7 +196,7 @@ printFrame(frame_data_t * frame_data_s, uint32_t index) {
 
             assert(s_incr);
             s += s_incr;
-            if (s != var_sizes[i] && (s % ALIGNMENT)) {
+            if (s != var_sizes[i] && (s % DBG_ALIGNMENT)) {
 
                 // the '\n check is if its first block in region
                 uint32_t prev_used = strlen(
