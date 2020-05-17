@@ -71,4 +71,7 @@ extern int32_t verbose;
 #define C_MODE
 #endif
 
+
+#define INT32_MASK 0xffffffff
+
 #endif

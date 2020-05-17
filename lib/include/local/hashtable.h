@@ -39,13 +39,7 @@
 #define DEFAULT_LOG_READS_PER_LINE (3)
 
 
-#define counter_bits      4
-#define counter_bits_mask 0xf
-#define slot_bits         12
-#define slot_bits_mask    0xfff
-
 #define RESIZE_THRESHOLD 2
-#define max_tables       64  // max tables to create
 
 
 //////////////////////////////////////////////////////////////////////

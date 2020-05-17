@@ -292,6 +292,28 @@ const char * unit_to_str(enum time_unit u);
 #define sizeof_bits(X) ((sizeof(X)) << 3)
 
 
+typedef union four_byte_cast {
+    uint32_t ui;
+    int32_t  i;
+    float    f;
+} fb_cast;
+
+
+typedef union eight_byte_cast {
+    void *   p;
+    void **  pp;
+    uint64_t ui;
+    int64_t  i;
+    double   d;
+} eb_cast;
+
+
+#define byte_f_to_i(X) ((fb_cast)(X)).i
+#define byte_d_to_i(X) ((eb_cast)(X)).i
+#define byte_i_to_f(X) ((fb_cast)(X)).f
+#define byte_i_to_d(X) ((fb_cast)(X)).d
+
+
 // For generating macros
 #define COMBINE_(X, Y) X##Y
 #define COMBINE(X, Y)  COMBINE_(X, Y)

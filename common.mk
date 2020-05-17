@@ -28,6 +28,17 @@ ifneq ($(WC), 0)
 WITH_CONSTANTS=$(WC)
 endif
 
+T=0
+TESTS=0
+WITH_TESTS=0
+ifneq ($(T), 0)
+TESTS=$(T)
+endif
+ifneq ($(TESTS), 0)
+WITH_TESTS=$(TESTS)
+endif
+
+
 
 #gcc for lyfe
 CC=g++

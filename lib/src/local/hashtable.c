@@ -15,6 +15,13 @@
 #define copy_bit 0x1  // sets 1s bit of ent ptr for resizing
 
 
+#define counter_bits      4
+#define counter_bits_mask 0xf
+#define slot_bits         12
+#define slot_bits_mask    0xfff
+#define max_tables        64  // max tables to create
+
+
 #define getCopy(X) lowBitsGet((void *)(X))
 #define setCopy(X)                                                             \
     lowBitsSet_atomic((void **)(&(X)), lowBitsGetPtr((void *)(X)), copy_bit)
