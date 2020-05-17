@@ -11,7 +11,6 @@
 #define DEFAULT_INIT_ALSIZE (128)
 
 
-
 typedef struct arr_node {
     uint32_t          x_idx;
     uint32_t          y_idx;
@@ -38,8 +37,8 @@ typedef struct arr_list {
 arr_list_t * init_alist(uint32_t total_items);
 void         free_alist(arr_list_t * a_list);
 
-void         remove_node_idx(arr_list_t * alist, uint32_t idx);
-void         remove_node(arr_list_t * alist, arr_node_t * drop_node);
+void remove_node_idx(arr_list_t * alist, uint32_t idx);
+void remove_node(arr_list_t * alist, arr_node_t * drop_node);
 
 arr_node_t * add_node(arr_list_t * alist, void * data);
 

@@ -1,13 +1,13 @@
 #include <datastruct/arrlist.h>
 
-#define PTR_MASK (((1UL) << 48) - 1)
+#define PTR_MASK    (((1UL) << 48) - 1)
 #define REMOVED_IDX ((arr_node_t *)(~((0UL))))
 
 #define GET_LOG_ISIZE(X) ((X)->mem_addr >> 48)
 #define GET_MEM_PTR(X)   ((X)->mem_addr & PTR_MASK)
 
 #define CHECK_REMOVED(X) ((X)->prev == REMOVED_IDX)
-#define SET_REMOVED(X) ((X)->prev = REMOVED_IDX)
+#define SET_REMOVED(X)   ((X)->prev = REMOVED_IDX)
 
 
 #define get_x_idx(X)        ((X)&INT32_MASK)
@@ -87,7 +87,7 @@ static void
 add_to_list(arr_list_t * alist, arr_node_t * new_node) {
     new_node->prev = NULL;
     if (alist->ll == NULL) {
-        alist->ll = new_node;
+        alist->ll      = new_node;
         new_node->next = NULL;
     }
     else {
@@ -123,10 +123,7 @@ get_x_y_idx(uint32_t idx, const uint32_t log_init_size) {
     uint32_t x_idx = IDX_TO_X(idx, log_init_size);
     uint32_t y_idx = IDX_TO_Y(idx, x_idx, log_init_size);
 
-    DBG_ASSERT(x_idx < 32,
-               "Error: invalid x index (%d >= %d)\n",
-               x_idx,
-               32);
+    DBG_ASSERT(x_idx < 32, "Error: invalid x index (%d >= %d)\n", x_idx, 32);
     DBG_ASSERT(y_idx < X_TO_SIZE(x_idx, log_init_size),
                "Error: invalid y index (%d >= %d)\n",
                y_idx,
@@ -159,10 +156,10 @@ add_node(arr_list_t * alist, void * data) {
     }
     else {
         const uint32_t log_init_size = GET_LOG_ISIZE(alist);
-        uint32_t idx = alist->nitems++;
-        uint64_t x_y_idx = get_x_y_idx(idx, log_init_size);
-        uint32_t x_idx   = get_x_idx(x_y_idx);
-        uint32_t y_idx   = get_y_idx(x_y_idx);
+        uint32_t       idx           = alist->nitems++;
+        uint64_t       x_y_idx       = get_x_y_idx(idx, log_init_size);
+        uint32_t       x_idx         = get_x_idx(x_y_idx);
+        uint32_t       y_idx         = get_y_idx(x_y_idx);
 
         if (alist->arr[x_idx] == NULL) {
             if (alist->arr[x_idx] == NULL) {
@@ -190,7 +187,7 @@ add_node(arr_list_t * alist, void * data) {
 arr_node_t *
 get_node_idx(arr_list_t * alist, uint32_t idx) {
     const uint32_t log_init_size = GET_LOG_ISIZE(alist);
-    uint64_t x_y_idx       = get_x_y_idx(idx, log_init_size);
+    uint64_t       x_y_idx       = get_x_y_idx(idx, log_init_size);
 
 
     uint32_t x_idx = get_x_idx(x_y_idx);
@@ -202,9 +199,8 @@ get_node_idx(arr_list_t * alist, uint32_t idx) {
     }
 
     arr_node_t * ret_node = alist->arr[x_idx] + y_idx;
-    
-    DBG_ASSERT(ret_node->x_idx == x_idx &&
-               ret_node->y_idx == y_idx,
+
+    DBG_ASSERT(ret_node->x_idx == x_idx && ret_node->y_idx == y_idx,
                "Error invalid index\n\t"
                "x_idx   : %d vs %d\n\t"
                "y_idx   : %d vs %d\n\t"
@@ -214,7 +210,7 @@ get_node_idx(arr_list_t * alist, uint32_t idx) {
                y_idx,
                ret_node->y_idx,
                idx);
-    
+
     return CHECK_REMOVED(ret_node) ? NULL : ret_node;
 }
 
