@@ -8,33 +8,25 @@
 #include <helpers/util.h>
 
 
-#define DEFAULT_INIT_ALSIZE (128)
-
+#define DEFAULT_INIT_AL_SIZE (1 << 28)
+#define AL_TO_PTR(X, Y)      ((arr_node_t *)(((uint64_t)(X)) + (Y)))
 
 typedef struct arr_node {
-    uint32_t          x_idx;
-    uint32_t          y_idx;
-    struct arr_node * next;
-    struct arr_node * prev;
-    void *            data;
+    uint32_t next;
+    uint32_t prev;
+    void *   data;
 } arr_node_t;
 
-typedef struct idx_node {
-    uint32_t          x_idx;
-    uint32_t          y_idx;
-    struct idx_node * next;
-} idx_node_t;
-
 typedef struct arr_list {
-    arr_node_t ** arr;
-    arr_node_t *  ll;
-    idx_node_t *  free_idx_que;
-    uint64_t      mem_addr;
-    uint32_t      nitems;
+    arr_node_t * arr;
+    uint32_t     ll;
+    uint32_t     free_idx_que;
+    uint64_t     mem_addr;
+    uint32_t     nitems;
 } arr_list_t;
 
 
-arr_list_t * init_alist(uint32_t total_items);
+arr_list_t * init_alist();
 void         free_alist(arr_list_t * a_list);
 
 void remove_node_idx(arr_list_t * alist, uint32_t idx);
@@ -44,4 +36,9 @@ arr_node_t * add_node(arr_list_t * alist, void * data);
 
 arr_node_t * get_node_idx(arr_list_t * alist, uint32_t idx);
 
+arr_node_t * get_next(arr_list_t * alist, arr_node_t * node);
+arr_node_t * get_prev(arr_list_t * alist, arr_node_t * node);
+
+uint32_t count_que(arr_list_t * alist);
+uint32_t count_ll(arr_list_t * alist);
 #endif

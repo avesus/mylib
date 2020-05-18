@@ -23,7 +23,7 @@ static ArgOption args[] = {
 static ArgDefs argp = { args, "Main", Version, NULL };
 
 
-#define AL_TEST_SIZE (1 << 25)
+#define AL_TEST_SIZE (1 << 24)
 static void test_alist();
 
 
@@ -55,19 +55,43 @@ main(int argc, char ** argv) {
 
 static void
 test_alist() {
-    for (int32_t i = 1; i < AL_TEST_SIZE; i += (random() % (AL_TEST_SIZE / 4)) + 1) {
-        int64_t      j;
-        uint32_t      count;
-        idx_node_t * temp_idx;
-        arr_node_t * temp;
-        
-        arr_list_t * alist = init_alist(i);
+    for (int32_t i = 1; i < AL_TEST_SIZE;
+         i += (random() % (AL_TEST_SIZE / 4)) + 1) {
+        int64_t  j = 0;
+        uint32_t count = 0;
+        uint32_t temp = 0;
+
+        arr_list_t * alist = init_alist();
         assert(alist);
 
         PRINT(MED_VERBOSE, "[%d / %d]: Testing Add\n", i, AL_TEST_SIZE);
         for (j = 0; j < AL_TEST_SIZE; j++) {
             add_node(alist, (void *)j);
         }
+
+        count = count_ll(alist);
+        DBG_ASSERT(count == AL_TEST_SIZE,
+                   "Error: count_ll does not match (%d != %d)\n",
+                   count,
+                   AL_TEST_SIZE);
+        
+        j    = AL_TEST_SIZE - 1;
+        temp = alist->ll;
+        while (temp) {
+            DBG_ASSERT(AL_TO_PTR(temp, alist->mem_addr)->data == (void *)j,
+                       "Error: Data does not match (%p != %p)\n",
+                       (void *)j,
+                       AL_TO_PTR(temp, alist->mem_addr)->data);
+            j--;
+            temp = AL_TO_PTR(temp, alist->mem_addr)->next;
+        }
+
+
+        count = count_ll(alist);
+        DBG_ASSERT(count == AL_TEST_SIZE,
+                   "Error: count_ll does not match (%d != %d)\n",
+                   count,
+                   AL_TEST_SIZE);
 
         PRINT(MED_VERBOSE, "[%d / %d]: Testing Get IDX\n", i, AL_TEST_SIZE);
         for (j = 0; j < AL_TEST_SIZE; j++) {
@@ -78,6 +102,7 @@ test_alist() {
                        n->data,
                        (void *)j);
         }
+
         DBG_ASSERT(alist->nitems == AL_TEST_SIZE,
                    "Error: Invalid nitems: %d\n",
                    alist->nitems);
@@ -87,17 +112,46 @@ test_alist() {
             remove_node_idx(alist, j);
         }
 
+        assert(count_ll(alist) == AL_TEST_SIZE / 2);
+        assert(count_que(alist) == AL_TEST_SIZE / 2);
+
+        
+        j    = AL_TEST_SIZE - 1;
+        temp = alist->ll;
+        while (temp) {
+            
+            DBG_ASSERT(AL_TO_PTR(temp, alist->mem_addr)->data == (void *)j,
+                       "Error: Data does not match (%p != %p)\n",
+                       (void *)j,
+                       AL_TO_PTR(temp, alist->mem_addr)->data);
+            j -= 2;
+            temp = AL_TO_PTR(temp, alist->mem_addr)->next;
+        }
+
+        DBG_ASSERT(j == (-1), "Error: Invalid j value (%d)\n", j);
+        
+        assert(count_ll(alist) == AL_TEST_SIZE / 2);
+        assert(count_que(alist) == AL_TEST_SIZE / 2);
+
         for (j = 0; j < AL_TEST_SIZE; j += 2) {
             assert(!get_node_idx(alist, j));
         }
 
-        PRINT(MED_VERBOSE, "[%d / %d]: Testing Free IDX que\n", i, AL_TEST_SIZE);
+        DBG_ASSERT(alist->nitems == AL_TEST_SIZE,
+                   "Error: Invalid nitems: %d\n",
+                   alist->nitems);
+
+        PRINT(MED_VERBOSE,
+              "[%d / %d]: Testing Free IDX que\n",
+              i,
+              AL_TEST_SIZE);
         count    = 0;
-        temp_idx = alist->free_idx_que;
-        while (temp_idx) {
+        temp = alist->free_idx_que;
+        while (temp) {
             count++;
-            temp_idx = temp_idx->next;
+            temp = AL_TO_PTR(temp, alist->mem_addr)->next;
         }
+
         DBG_ASSERT(count == (AL_TEST_SIZE / 2),
                    "Error: invalid number of free idx nodes (%d vs %d)\n",
                    count,
@@ -105,12 +159,16 @@ test_alist() {
 
 
         PRINT(MED_VERBOSE, "[%d / %d]: Testing List\n", i, AL_TEST_SIZE);
+
         j    = AL_TEST_SIZE - 1;
         temp = alist->ll;
         while (temp) {
-            assert(temp->data == (void *)j);
+            DBG_ASSERT(AL_TO_PTR(temp, alist->mem_addr)->data == (void *)j,
+                       "Error: Data does not match (%p != %p)\n",
+                       (void *)j,
+                       AL_TO_PTR(temp, alist->mem_addr)->data);
             j -= 2;
-            temp = temp->next;
+            temp = AL_TO_PTR(temp, alist->mem_addr)->next;
         }
 
         DBG_ASSERT(j == (-1), "Error: Invalid j value (%d)\n", j);
@@ -120,7 +178,7 @@ test_alist() {
             add_node(alist, (void *)j);
         }
 
-        assert(alist->free_idx_que == NULL);
+        assert(alist->free_idx_que == 0);
 
         DBG_ASSERT(alist->nitems == AL_TEST_SIZE,
                    "Error: Invalid nitems: %d\n",
@@ -129,14 +187,13 @@ test_alist() {
         PRINT(MED_VERBOSE, "[%d / %d]: Testing Remove All\n", i, AL_TEST_SIZE);
         count = 0;
         while (alist->ll) {
-            remove_node(alist, alist->ll);
+            remove_node(alist, AL_TO_PTR(alist->ll, alist->mem_addr));
             count++;
         }
-        
+
         DBG_ASSERT(alist->nitems == count,
                    "Error: Invalid llcount: %d\n",
                    count);
         free_alist(alist);
     }
-
 }
