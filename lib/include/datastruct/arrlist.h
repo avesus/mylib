@@ -8,7 +8,7 @@
 #include <helpers/util.h>
 
 
-#define DEFAULT_INIT_AL_SIZE (1 << 28)
+#define DEFAULT_INIT_AL_SIZE (1 << 30)
 #define AL_TO_PTR(X, Y)      ((arr_node_t *)(((uint64_t)(X)) + (Y)))
 
 typedef struct arr_node {
@@ -18,11 +18,10 @@ typedef struct arr_node {
 } arr_node_t;
 
 typedef struct arr_list {
-    arr_node_t * arr;
-    uint32_t     ll;
-    uint32_t     free_idx_que;
-    uint64_t     mem_addr;
-    uint32_t     nitems;
+    uint64_t mem_addr;
+    uint32_t ll;
+    uint32_t free_idx_que;
+    uint32_t nitems;
 } arr_list_t;
 
 
@@ -33,11 +32,12 @@ void remove_node_idx(arr_list_t * alist, uint32_t idx);
 void remove_node(arr_list_t * alist, arr_node_t * drop_node);
 
 arr_node_t * add_node(arr_list_t * alist, void * data);
-
 arr_node_t * get_node_idx(arr_list_t * alist, uint32_t idx);
 
 arr_node_t * get_next(arr_list_t * alist, arr_node_t * node);
 arr_node_t * get_prev(arr_list_t * alist, arr_node_t * node);
+
+arr_node_t * pop_node(arr_list_t * alist);
 
 uint32_t count_que(arr_list_t * alist);
 uint32_t count_ll(arr_list_t * alist);

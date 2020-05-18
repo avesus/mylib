@@ -25,9 +25,7 @@ init_alist() {
 
 
     arr_list_t * new_alist = (arr_list_t *)start_addr;
-
-    new_alist->arr      = (arr_node_t *)(start_addr + sizeof(arr_list_t));
-    new_alist->mem_addr = start_addr;
+    new_alist->mem_addr    = start_addr;
 
     return new_alist;
 }
@@ -37,7 +35,6 @@ void
 free_alist(arr_list_t * alist) {
     const uint64_t _max_size =
         sizeof(arr_list_t) + (DEFAULT_INIT_AL_SIZE * sizeof(arr_node_t));
-
     mymunmap(alist, _max_size);
 }
 
@@ -102,7 +99,9 @@ add_node(arr_list_t * alist, void * data) {
         new_node = check_idx;
     }
     else {
-        new_node = alist->arr + alist->nitems++;
+        const uint32_t idx = alist->nitems++;
+        new_node = (arr_node_t *)(alist->mem_addr + sizeof(arr_list_t) +
+                                  idx * sizeof(arr_node_t));
     }
 
     new_node->data = data;
@@ -118,28 +117,35 @@ get_node_idx(arr_list_t * alist, uint32_t idx) {
         return NULL;
     }
 
-    arr_node_t * ret_node = alist->arr + idx;
+    arr_node_t * ret_node =
+        (arr_node_t *)(alist->mem_addr + sizeof(arr_list_t) +
+                       idx * sizeof(arr_node_t));
+
     return CHECK_REMOVED(ret_node) ? NULL : ret_node;
 }
 
 void
 remove_node_idx(arr_list_t * alist, uint32_t idx) {
     arr_node_t * drop_node = get_node_idx(alist, idx);
-    void * cur_data = drop_node->data;
     remove_node(alist, drop_node);
-    assert(cur_data == drop_node->data);
 }
 
 
 void
 remove_node(arr_list_t * alist, arr_node_t * drop_node) {
-    void * cur_data = drop_node->data;
     remove_from_list(alist, drop_node);
-    assert(cur_data == drop_node->data);
     SET_REMOVED(drop_node);
-    assert(cur_data == drop_node->data);
     add_to_que(alist, drop_node);
-    assert(cur_data == drop_node->data);
+}
+
+arr_node_t *
+pop_node(arr_list_t * alist) {
+    if (alist->ll) {
+        arr_node_t * ret_node = AL_TO_PTR(alist->ll, alist->mem_addr);
+        remove_from_list(alist, ret_node);
+        return ret_node;
+    }
+    return NULL;
 }
 
 
