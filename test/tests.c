@@ -29,12 +29,14 @@ static void test_alist();
 
 int
 main(int argc, char ** argv) {
+    FDBG_INIT_DEBUGGER;
+    
     progname = argv[0];
 
     srand(rseed);
     srandom(rseed);
 
-    INIT_DEBUGGER;
+
 
     ArgParser * ap = createArgumentParser(&argp);
     if (parseArguments(ap, argc, argv)) {
@@ -48,7 +50,7 @@ main(int argc, char ** argv) {
     test_alist();
 #endif
 
-    FREE_DEBUGGER;
+    FDBG_FREE_DEBUGGER;
     return 0;
 }
 

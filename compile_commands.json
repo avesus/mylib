@@ -13,10 +13,10 @@
             "-D_GNU_SOURCE",
             "-I/home/noah/programs/mylib/config",
             "-I/home/noah/programs/mylib/lib/include/",
-            "src/helpers/util.c"
+            "src/helpers/clock.c"
         ],
         "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/helpers/util.c"
+        "file": "src/helpers/clock.c"
     },
     {
         "arguments": [
@@ -32,10 +32,10 @@
             "-D_GNU_SOURCE",
             "-I/home/noah/programs/mylib/config",
             "-I/home/noah/programs/mylib/lib/include/",
-            "src/helpers/arg.c"
+            "src/helpers/temp.c"
         ],
         "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/helpers/arg.c"
+        "file": "src/helpers/temp.c"
     },
     {
         "arguments": [
@@ -70,10 +70,10 @@
             "-D_GNU_SOURCE",
             "-I/home/noah/programs/mylib/config",
             "-I/home/noah/programs/mylib/lib/include/",
-            "src/helpers/opt.c"
+            "src/helpers/cycles.c"
         ],
         "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/helpers/opt.c"
+        "file": "src/helpers/cycles.c"
     },
     {
         "arguments": [
@@ -108,10 +108,10 @@
             "-D_GNU_SOURCE",
             "-I/home/noah/programs/mylib/config",
             "-I/home/noah/programs/mylib/lib/include/",
-            "driver.c"
+            "src/helpers/temp_barrier.c"
         ],
-        "directory": "/home/noah/programs/mylib/main",
-        "file": "driver.c"
+        "directory": "/home/noah/programs/mylib/lib",
+        "file": "src/helpers/temp_barrier.c"
     },
     {
         "arguments": [
@@ -127,10 +127,10 @@
             "-D_GNU_SOURCE",
             "-I/home/noah/programs/mylib/config",
             "-I/home/noah/programs/mylib/lib/include/",
-            "src/helpers/bits.c"
+            "driver.c"
         ],
-        "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/helpers/bits.c"
+        "directory": "/home/noah/programs/mylib/main",
+        "file": "driver.c"
     },
     {
         "arguments": [
@@ -165,48 +165,10 @@
             "-D_GNU_SOURCE",
             "-I/home/noah/programs/mylib/config",
             "-I/home/noah/programs/mylib/lib/include/",
-            "src/datastruct/arrlist.c"
+            "src/helpers/util.c"
         ],
         "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/datastruct/arrlist.c"
-    },
-    {
-        "arguments": [
-            "c++",
-            "-c",
-            "-O0",
-            "-std=c++11",
-            "-Wall",
-            "-Wno-pointer-arith",
-            "-Wno-unused-function",
-            "-g3",
-            "-DDEBUG",
-            "-D_GNU_SOURCE",
-            "-I/home/noah/programs/mylib/config",
-            "-I/home/noah/programs/mylib/lib/include/",
-            "src/helpers/clock.c"
-        ],
-        "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/helpers/clock.c"
-    },
-    {
-        "arguments": [
-            "c++",
-            "-c",
-            "-O0",
-            "-std=c++11",
-            "-Wall",
-            "-Wno-pointer-arith",
-            "-Wno-unused-function",
-            "-g3",
-            "-DDEBUG",
-            "-D_GNU_SOURCE",
-            "-I/home/noah/programs/mylib/config",
-            "-I/home/noah/programs/mylib/lib/include/",
-            "src/helpers/cycles.c"
-        ],
-        "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/helpers/cycles.c"
+        "file": "src/helpers/util.c"
     },
     {
         "arguments": [
@@ -241,10 +203,10 @@
             "-D_GNU_SOURCE",
             "-I/home/noah/programs/mylib/config",
             "-I/home/noah/programs/mylib/lib/include/",
-            "src/helpers/temp_barrier.c"
+            "src/helpers/opt.c"
         ],
         "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/helpers/temp_barrier.c"
+        "file": "src/helpers/opt.c"
     },
     {
         "arguments": [
@@ -260,9 +222,47 @@
             "-D_GNU_SOURCE",
             "-I/home/noah/programs/mylib/config",
             "-I/home/noah/programs/mylib/lib/include/",
-            "src/helpers/temp.c"
+            "src/helpers/arg.c"
         ],
         "directory": "/home/noah/programs/mylib/lib",
-        "file": "src/helpers/temp.c"
+        "file": "src/helpers/arg.c"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-O0",
+            "-std=c++11",
+            "-Wall",
+            "-Wno-pointer-arith",
+            "-Wno-unused-function",
+            "-g3",
+            "-DDEBUG",
+            "-D_GNU_SOURCE",
+            "-I/home/noah/programs/mylib/config",
+            "-I/home/noah/programs/mylib/lib/include/",
+            "src/helpers/bits.c"
+        ],
+        "directory": "/home/noah/programs/mylib/lib",
+        "file": "src/helpers/bits.c"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-O0",
+            "-std=c++11",
+            "-Wall",
+            "-Wno-pointer-arith",
+            "-Wno-unused-function",
+            "-g3",
+            "-DDEBUG",
+            "-D_GNU_SOURCE",
+            "-I/home/noah/programs/mylib/config",
+            "-I/home/noah/programs/mylib/lib/include/",
+            "src/datastruct/arrlist.c"
+        ],
+        "directory": "/home/noah/programs/mylib/lib",
+        "file": "src/datastruct/arrlist.c"
     }
 ]

@@ -32,7 +32,7 @@ BROKEN //this is just to cause compiler error
 #endif
 
 //#define STACK_TRACE_ON
-//#define FRAME_DEBUGGER
+#define FRAME_DEBUGGER
 #define DEBUG_MODE
 #define USAGE_CHECK
 

@@ -3,8 +3,6 @@
 
 //////////////////////////////////////////////////////////////////////
 // Defines that should not be shared with other files
-#define EQUALS     1
-#define NOT_EQUALS 0
 
 
 // return values for checking table.  Returned by lookupQuery
@@ -24,10 +22,10 @@
 
 #define getCopy(X) lowBitsGet((void *)(X))
 #define setCopy(X)                                                             \
-    lowBitsSet_atomic((void **)(&(X)), lowBitsGetPtr((void *)(X)), copy_bit)
+    v lowBitsSet_atomic((void **)(&(X)), lowBitsGetPtr((void *)(X)), copy_bit)
 
 
-#define set_return(X, Y) ((node *)(((uint64_t)get_ptr(X)) | (Y)))
+#define set_return(X, Y) ((piq_node_t *)(((uint64_t)get_ptr(X)) | (Y)))
 
 #define getNodePtr(X) (getPtr((void *)(X)))
 
@@ -63,8 +61,8 @@ uint16_t genTag(pthread_t t);
 // compare key comparison
 #define compare_keys(X, Y) ((X) == (Y))
 
-#define getKey(X)    (((node *)getNodePtr(X))->key)
-#define getVal(X)    (((node *)getNodePtr(X))->val)
+#define getKey(X)    (((piq_node_t *)getNodePtr(X))->key)
+#define getVal(X)    (((piq_node_t *)getNodePtr(X))->val)
 #define getKeyLen(X) sizeof(pthread_t)
 
 // hash function for int (key is passed as a ptr)
@@ -74,31 +72,31 @@ uint16_t genTag(pthread_t t);
 
 //////////////////////////////////////////////////////////////////////
 // Config for hash function table will use
-uint32_t murmur3_32(const uint8_t * key, size_t len, uint32_t seed);
+static uint32_t murmur3_32(const uint8_t * key, size_t len, uint32_t seed);
 //////////////////////////////////////////////////////////////////////
 
 
-#ifdef lazy_resize
-static uint32_t addNode_resize(hashTable * head,
-                               uint32_t    start,
-                               node *      n,
-                               uint32_t    tid,
-                               uint16_t    tag
-#ifdef next_hash
-                               ,
-                               uint32_t from_slot
-#endif  // next_hash
+#ifdef PIQ_LAZY_RESIZE
+static uint32_t add_node_resize(piq_ht *     head,
+                                uint32_t     start,
+                                piq_node_t * n,
+                                uint32_t     tid,
+                                uint16_t     tag
+#ifdef PIQ_NEXT_HASH
+                                ,
+                                uint32_t from_slot
+#endif  // PIQ_NEXT_HASH
 );
-static void resize_node(hashTable * head,
-                        subTable *  ht,
-                        uint32_t    slot,
-                        uint32_t    tid);
-#endif  // lazy_resize
+static void resize_node(piq_ht *         head,
+                        piq_subtable_t * ht,
+                        uint32_t         slot,
+                        uint32_t         tid);
+#endif  // PIQ_LAZY_RESIZE
 
 
 //////////////////////////////////////////////////////////////////////
 // hash function defined here
-uint32_t
+static uint32_t
 murmur3_32(const uint8_t * key, size_t len, uint32_t seed) {
     uint32_t h = seed;
     if (len > 3) {
@@ -140,13 +138,13 @@ murmur3_32(const uint8_t * key, size_t len, uint32_t seed) {
 
 
 uint16_t
-genTag(key_type t) {
+genTag(piq_key_t t) {
     t ^= t >> 32;
     t ^= t >> 16;
     return t & 0xffff;
 }
 
-#ifdef lazy_resize
+#ifdef PIQ_LAZY_RESIZE
 // helper function that returns sum of array up to size
 static uint32_t
 sumArr(uint32_t * arr, uint32_t size) {
@@ -161,8 +159,8 @@ sumArr(uint32_t * arr, uint32_t size) {
 }
 #endif
 
-#ifdef next_hash
-// creates short to store in high bits of node * with info on next slot
+#ifdef PIQ_NEXT_HASH
+// creates short to store in high bits of piq_node_t * with info on next slot
 // locations
 static uint16_t
 createNHMask(uint32_t hv, uint32_t ltsize) {
@@ -180,17 +178,20 @@ createNHMask(uint32_t hv, uint32_t ltsize) {
 #endif
 
 // creates a subtable
-static subTable *
-createST(hashTable * head, uint32_t tsize) {
-    subTable * ht = (subTable *)myacalloc(cache_line_size, 1, sizeof(subTable));
+static piq_subtable_t *
+createST(piq_ht * head, uint32_t tsize) {
+    piq_subtable_t * ht = (piq_subtable_t *)myacalloc(L1_CACHE_LINE_SIZE,
+                                                      1,
+                                                      sizeof(piq_subtable_t));
 
     // calloc better for large allocations and not important for this one to be
     // aligned
-    ht->innerTable = (node **)mycalloc(tsize, sizeof(node *));
+    ht->innerTable = (piq_node_t **)mycalloc(tsize, sizeof(piq_node_t *));
 
-#ifdef lazy_resize
-    ht->threadCopy = (uint32_t *)mycalloc(DEFAULT_SPREAD, cache_line_size);
-#endif  // lazy_resize
+#ifdef PIQ_LAZY_RESIZE
+    ht->threadCopy =
+        (uint32_t *)mycalloc(PIQ_DEFAULT_SPREAD, L1_CACHE_LINE_SIZE);
+#endif  // PIQ_LAZY_RESIZE
 
     ht->logTableSize = ulog2_32(tsize);
     ht->tableSize    = tsize;
@@ -199,11 +200,11 @@ createST(hashTable * head, uint32_t tsize) {
 
 // frees a given subtable that was created for adddrop (that failed)
 static void
-freeST(subTable * table) {
+freeST(piq_subtable_t * table) {
     myfree(table->innerTable);
-#ifdef lazy_resize
+#ifdef PIQ_LAZY_RESIZE
     myfree(table->threadCopy);
-#endif  // lazy_resize
+#endif  // PIQ_LAZY_RESIZE
     myfree(table);
 }
 
@@ -212,15 +213,15 @@ freeST(subTable * table) {
 // means not in the hashtable, s means in the hashtable and was found (return s
 // so can get the value of the item). unk means unknown if in table.
 static uint32_t
-lookupQuery(subTable * ht, key_type key, uint32_t slot) {
+lookupQuery(piq_subtable_t * ht, piq_key_t key, uint32_t slot) {
     // if find null slot know item is not in hashtable as would have been added
     // there otherwise
     if (getNodePtr(ht->innerTable[slot]) == NULL) {
-#ifdef mark_null
+#ifdef PIQ_MARK_NULL
         if (getCopy(ht->innerTable[slot])) {
             return unknown;
         }
-#endif  // mark_null
+#endif  // PIQ_MARK_NULL
         return not_in;
     }
 
@@ -238,28 +239,28 @@ lookupQuery(subTable * ht, key_type key, uint32_t slot) {
 // already in the table, s if the value is not in the table, and unk to try the
 // next hash function
 static uint32_t
-lookup(hashTable * head,
-       subTable *  ht,
-       node *      n,
-       uint32_t    slot,
-       uint32_t    tid
-#ifdef lazy_resize
+lookup(piq_ht *         head,
+       piq_subtable_t * ht,
+       piq_node_t *     n,
+       uint32_t         slot,
+       uint32_t         tid
+#ifdef PIQ_LAZY_RESIZE
        ,
        uint32_t doCopy,
        uint32_t start
-#endif  // lazy_resize //
+#endif  // PIQ_LAZY_RESIZE //
 ) {
 
-    // if found null slot return index so insert can try and put the node in the
-    // index
+    // if found null slot return index so insert can try and put the piq_node_t
+    // in the index
     if (getNodePtr(ht->innerTable[slot]) == NULL) {
-#if defined mark_null && defined lazy_resize
+#if defined PIQ_MARK_NULL && defined PIQ_LAZY_RESIZE
         if (doCopy) {
             if (setCopy(ht->innerTable[slot])) {
                 resize_node(head, ht, slot, tid);
             }
         }
-#endif  // mark_null && lazy_resize
+#endif  // PIQ_MARK_NULL && PIQ_LAZY_RESIZE
         return slot;
     }
 
@@ -269,7 +270,7 @@ lookup(hashTable * head,
         return is_in;
     }
 
-#ifdef lazy_resize
+#ifdef PIQ_LAZY_RESIZE
     // neither know if value is in or not, first check if this is smallest
     // subtable and resizing is take place. If so move current item at subtable
     // to next one.
@@ -279,18 +280,18 @@ lookup(hashTable * head,
             resize_node(head, ht, slot, tid);
         }
     }
-#endif  // lazy_resize
+#endif  // PIQ_LAZY_RESIZE
     return unknown_in;
 }
 
 // function to add new subtable to hashtable if dont find open slot
 static void
-addDrop(hashTable * head,
-        subTable *  toadd,
-        uint64_t    addSlot,
-        node *      n,
-        uint32_t    tid,
-        uint32_t    start) {
+addDrop(piq_ht *         head,
+        piq_subtable_t * toadd,
+        uint64_t         addSlot,
+        piq_node_t *     n,
+        uint32_t         tid,
+        uint32_t         start) {
 
     // make the array circular so add/delete continuous will always have space.
     // Assumed that resizer will keep up with insertion rate (this is probably
@@ -300,8 +301,8 @@ addDrop(hashTable * head,
     // again irrelivant of delete/insert ratio
 
     // try and add new preallocated table (CAS so only one added)
-    subTable * expected = NULL;
-    uint32_t   res      = __atomic_compare_exchange(&head->tableArray[addSlot],
+    piq_subtable_t * expected = NULL;
+    uint32_t         res = __atomic_compare_exchange(&head->tableArray[addSlot],
                                              &expected,
                                              &toadd,
                                              1,
@@ -331,11 +332,11 @@ addDrop(hashTable * head,
 }
 
 
-#ifdef lazy_resize
+#ifdef PIQ_LAZY_RESIZE
 // wrapper for resizing node, will call add resize if necessary and
 // possible increment head's table index
 static void
-resize_node(hashTable * head, subTable * ht, uint32_t slot, uint32_t tid) {
+resize_node(piq_ht * head, piq_subtable_t * ht, uint32_t slot, uint32_t tid) {
 
     // exstart/newstart for CAS that might take place
     uint64_t exStart  = head->start;
@@ -343,28 +344,28 @@ resize_node(hashTable * head, subTable * ht, uint32_t slot, uint32_t tid) {
 
 // if item is not deleted copy up (this is how deleted items are culled as
 // they will not be copied)
-#ifdef mark_null
+#ifdef PIQ_MARK_NULL
     if (getNodePtr(ht->innerTable[slot])) {
-#endif  // mark_null
+#endif  // PIQ_MARK_NULL
 
-        addNode_resize(head,
-                       head->start + 1,
-                       lowBitsGetPtr(ht->innerTable[slot]),
-                       tid,
-                       getKeyTag(getKey(ht->innerTable[slot]))
-#ifdef next_hash
-                           ,
-                       slot
-#endif  // next_hash
+        add_node_resize(head,
+                        head->start + 1,
+                        lowBitsGetPtr(ht->innerTable[slot]),
+                        tid,
+                        getKeyTag(getKey(ht->innerTable[slot]))
+#ifdef PIQ_NEXT_HASH
+                            ,
+                        slot
+#endif  // PIQ_NEXT_HASH
         );
 
-#ifdef mark_null
+#ifdef PIQ_MARK_NULL
     }
-#endif  // mark_null
+#endif  // PIQ_MARK_NULL
     // increment thread index
     incr(ht->threadCopy, tid, 1);
     // if all slots have been copied increment min subtable
-    if (ht->tableSize == sumArr(ht->threadCopy, DEFAULT_SPREAD)) {
+    if (ht->tableSize == sumArr(ht->threadCopy, PIQ_DEFAULT_SPREAD)) {
         if (__atomic_compare_exchange(&head->start,
                                       &exStart,
                                       &newStart,
@@ -379,37 +380,37 @@ resize_node(hashTable * head, subTable * ht, uint32_t slot, uint32_t tid) {
 // optimize around i.e should never find self deleted, dont need to
 // recompute tag, and later will remove need for rehashing
 static uint32_t
-addNode_resize(hashTable * head,
-               uint32_t    start,
-               node *      n,
-               uint32_t    tid,
-               uint16_t    tag
-#ifdef next_hash
-               ,
-               uint32_t from_slot
-#endif  // next_hash
+add_node_resize(piq_ht *     head,
+                uint32_t     start,
+                piq_node_t * n,
+                uint32_t     tid,
+                uint16_t     tag
+#ifdef PIQ_NEXT_HASH
+                ,
+                uint32_t from_slot
+#endif  // PIQ_NEXT_HASH
 ) {
 
 
-    const uint32_t logReadsPerLine = DEFAULT_LOG_READS_PER_LINE;
-    const uint32_t uBound          = DEFAULT_READS_PER_LINE;
-    const uint32_t ha              = DEFAULT_HASH_ATTEMPTS;
+    const uint32_t logReadsPerLine = PIQ_DEFAULT_LOG_READS_PER_LINE;
+    const uint32_t uBound          = PIQ_DEFAULT_READS_PER_LINE;
+    const uint32_t ha              = PIQ_DEFAULT_HASH_ATTEMPTS;
 
-    uint32_t   localEnd = head->end;
-    subTable * ht       = NULL;
+    uint32_t         localEnd = head->end;
+    piq_subtable_t * ht       = NULL;
 
 
 //////////////////////////////////////////////////////////////////////
 // next hash optimization start
-#ifdef next_hash
+#ifdef PIQ_NEXT_HASH
     from_slot >>= logReadsPerLine;
     from_slot <<= logReadsPerLine;
 
     uint32_t amount_next_bits = getCounter(n);
     uint32_t hb_index         = slot_bits - amount_next_bits;
     amount_next_bits += start;
-    subTable * prev = NULL;
-    ht              = head->tableArray[(start - 1) & (max_tables - 1)];
+    piq_subtable_t * prev = NULL;
+    ht                    = head->tableArray[(start - 1) & (max_tables - 1)];
     for (uint32_t j = start; j < amount_next_bits; j++) {
         // prev for checking if new slot bit is needed
         prev = ht;
@@ -434,11 +435,11 @@ addNode_resize(hashTable * head,
                                       n,
                                       slot + (c & (uBound - 1)),
                                       tid
-#ifdef lazy_resize
+#ifdef PIQ_LAZY_RESIZE
                                       ,
                                       0,
                                       j
-#endif  // lazy_resize
+#endif  // PIQ_LAZY_RESIZE
                 );
 
                 // lookup value in sub table
@@ -457,8 +458,8 @@ addNode_resize(hashTable * head,
 
                     // update counter based on bits used
                     setCounter(n, slot_bits - hb_index);
-                    node *   expected = NULL;
-                    uint32_t cmp =
+                    piq_node_t * expected = NULL;
+                    uint32_t     cmp =
                         __atomic_compare_exchange((ht->innerTable + res),
                                                   &expected,
                                                   &n,
@@ -498,17 +499,17 @@ addNode_resize(hashTable * head,
                 << 1;
 
             // create next subtables
-            subTable * new_table = createST(head, nextTableSize);
+            piq_subtable_t * new_table = createST(head, nextTableSize);
             addDrop(head, new_table, localEnd, n, tid, start + 1);
         }
     }
 
-#endif  // next_hash
+#endif  // PIQ_NEXT_HASH
     //////////////////////////////////////////////////////////////////////
     // next hash optimization end
 
 
-    uint32_t buckets[DEFAULT_HASH_ATTEMPTS];
+    uint32_t buckets[PIQ_DEFAULT_HASH_ATTEMPTS];
     for (uint32_t i = 0; i < ha; i++) {
         buckets[i] = hashFun(getKey(n), head->seeds[i]);
     }
@@ -532,11 +533,11 @@ addNode_resize(hashTable * head,
                                           n,
                                           slot + (c & (uBound - 1)),
                                           tid
-#ifdef lazy_resize
+#ifdef PIQ_LAZY_RESIZE
                                           ,
                                           0,
                                           j
-#endif  // lazy_resize
+#endif  // PIQ_LAZY_RESIZE
                     );
 
 
@@ -556,14 +557,14 @@ addNode_resize(hashTable * head,
                         // value it lost to is item itself return. If neither
                         // continue trying to add
 
-#ifdef next_hash
+#ifdef PIQ_NEXT_HASH
                         uint16_t next_bits =
                             createNHMask(buckets[0], ht->logTableSize);
                         setNH(n, next_bits);
-#endif  // next_hash
+#endif  // PIQ_NEXT_HASH
 
-                        node *   expected = NULL;
-                        uint32_t cmp =
+                        piq_node_t * expected = NULL;
+                        uint32_t     cmp =
                             __atomic_compare_exchange((ht->innerTable + res),
                                                       &expected,
                                                       &n,
@@ -598,12 +599,12 @@ addNode_resize(hashTable * head,
             head->tableArray[(localEnd - 1) & (max_tables - 1)]->tableSize << 1;
 
         // create next subtables
-        subTable * new_table = createST(head, nextTableSize);
+        piq_subtable_t * new_table = createST(head, nextTableSize);
         addDrop(head, new_table, localEnd, n, tid, start + 1);
         start = localEnd;
     }
 }
-#endif  // lazy_resize
+#endif  // PIQ_LAZY_RESIZE
 
 //////////////////////////////////////////////////////////////////////
 // end helpers
@@ -611,15 +612,15 @@ addNode_resize(hashTable * head,
 
 // api function user calls to query the table for a given node. Returns
 // 1 if found, 0 otherwise.
-node *
-findNode(hashTable * head, key_type key, uint32_t tid) {
-    subTable *     ht              = NULL;
-    const uint32_t logReadsPerLine = DEFAULT_LOG_READS_PER_LINE;
-    const uint32_t uBound          = DEFAULT_READS_PER_LINE;
-    const uint32_t ha              = DEFAULT_HASH_ATTEMPTS;
+piq_node_t *
+piq_find_node(piq_ht * head, piq_key_t key, uint32_t tid) {
+    piq_subtable_t * ht              = NULL;
+    const uint32_t   logReadsPerLine = PIQ_DEFAULT_LOG_READS_PER_LINE;
+    const uint32_t   uBound          = PIQ_DEFAULT_READS_PER_LINE;
+    const uint32_t   ha              = PIQ_DEFAULT_HASH_ATTEMPTS;
 
 
-    uint32_t buckets[DEFAULT_HASH_ATTEMPTS];
+    uint32_t buckets[PIQ_DEFAULT_HASH_ATTEMPTS];
     for (uint32_t i = 0; i < ha; i++) {
         buckets[i] = hashFun(key, head->seeds[i]);
     }
@@ -642,7 +643,7 @@ findNode(hashTable * head, key_type key, uint32_t tid) {
                 if (res == not_in) {
                     return NULL; /* indicate not found */
                 }
-                return (frame_node *)getNodePtr(ht->innerTable[res]);
+                return (frame_node_t *)getNodePtr(ht->innerTable[res]);
             }
         }
     }
@@ -653,27 +654,27 @@ findNode(hashTable * head, key_type key, uint32_t tid) {
 
 // insert a new node into the table. Returns 0 if node is already present, 1
 // otherwise.
-node *
-addNode(hashTable * head, node * n, uint32_t tid) {
+piq_node_t *
+piq_add_node(piq_ht * head, piq_node_t * n, uint32_t tid) {
     // use local max for adddroping subtables (otherwise race condition
     // where 2 go to add to slot n, one completes addition and increments
     // head->end and then second one goes and double adds. Won't affect
     // correctness but best not have that happen.
 
 
-    const uint32_t logReadsPerLine = DEFAULT_LOG_READS_PER_LINE;
-    const uint32_t uBound          = DEFAULT_READS_PER_LINE;
-    const uint32_t ha              = DEFAULT_HASH_ATTEMPTS;
+    const uint32_t logReadsPerLine = PIQ_DEFAULT_LOG_READS_PER_LINE;
+    const uint32_t uBound          = PIQ_DEFAULT_READS_PER_LINE;
+    const uint32_t ha              = PIQ_DEFAULT_HASH_ATTEMPTS;
 
-    uint32_t buckets[DEFAULT_HASH_ATTEMPTS];
+    uint32_t buckets[PIQ_DEFAULT_HASH_ATTEMPTS];
     for (uint32_t i = 0; i < ha; i++) {
         buckets[i] = hashFun(getKey(n), head->seeds[i]);
     }
 
-    uint16_t   tag      = hashTag(getKey(n));
-    uint32_t   localEnd = head->end;
-    uint32_t   start    = head->start;
-    subTable * ht       = NULL;
+    uint16_t         tag      = hashTag(getKey(n));
+    uint32_t         localEnd = head->end;
+    uint32_t         start    = head->start;
+    piq_subtable_t * ht       = NULL;
     while (1) {
         // iterate through subtables
         // again is mod max_subtables
@@ -685,10 +686,10 @@ addNode(hashTable * head, node * n, uint32_t tid) {
 
             // do copy if there is a new bigger subtable and
             // currently in smallest subtable
-#ifdef lazy_resize
+#ifdef PIQ_LAZY_RESIZE
             uint32_t doCopy = (j == (head->start & (max_tables - 1))) &&
                               (head->end - head->start > RESIZE_THRESHOLD);
-#endif  // lazy_resize
+#endif  // PIQ_LAZY_RESIZE
 
             // iterate through hash functions
             for (uint32_t i = 0; i < ha; i++) {
@@ -700,11 +701,11 @@ addNode(hashTable * head, node * n, uint32_t tid) {
                                          n,
                                          slot + (c & (uBound - 1)),
                                          tid
-#ifdef lazy_resize
+#ifdef PIQ_LAZY_RESIZE
                                          ,
                                          doCopy,
                                          j
-#endif  // lazy_resize
+#endif  // PIQ_LAZY_RESIZE
                     );
                     // lookup value in sub table
 
@@ -726,11 +727,11 @@ addNode(hashTable * head, node * n, uint32_t tid) {
                         // for example cause setCopy to
                         // fail spuriously)
                         // next hash stuff here
-#ifdef next_hash
+#ifdef PIQ_NEXT_HASH
                         uint16_t next_bits =
                             createNHMask(buckets[0], ht->logTableSize);
                         setNH(n, next_bits);
-#endif  // next_hash
+#endif  // PIQ_NEXT_HASH
 
                         // if return was null (is
                         // available slot in sub table)
@@ -739,8 +740,8 @@ addNode(hashTable * head, node * n, uint32_t tid) {
                         // value it lost to is item
                         // itself return. If neither
                         // continue trying to add
-                        node *   expected = NULL;
-                        uint32_t cmp =
+                        piq_node_t * expected = NULL;
+                        uint32_t     cmp =
                             __atomic_compare_exchange((ht->innerTable + res),
                                                       &expected,
                                                       &n,
@@ -759,9 +760,9 @@ addNode(hashTable * head, node * n, uint32_t tid) {
                             // same, if not keep
                             // going, if is turn 0
                             if (
-#ifdef mark_null
+#ifdef PIQ_MARK_NULL
                                 getNodePtr(ht->innerTable[res]) &&
-#endif  // mark_null
+#endif  // PIQ_MARK_NULL
                                 compare_keys(getKey(ht->innerTable[res]),
                                              getKey(n))) {
                                 return set_return(ht->innerTable[res], 0);
@@ -782,7 +783,7 @@ addNode(hashTable * head, node * n, uint32_t tid) {
             head->tableArray[(localEnd - 1) & (max_tables - 1)]->tableSize << 1;
 
         // create next subtables
-        subTable * new_table = createST(head, nextTableSize);
+        piq_subtable_t * new_table = createST(head, nextTableSize);
         addDrop(head, new_table, localEnd, n, tid, start + 1);
         start = localEnd;
     }
@@ -790,22 +791,22 @@ addNode(hashTable * head, node * n, uint32_t tid) {
 
 // initial hashtable. First table head will be null, after that will
 // just reinitialize first table returns a pointer to the hashtable
-hashTable *
-initTable() {
+piq_ht *
+piq_init_table() {
 
-    hashTable * head =
-        (hashTable *)myacalloc(cache_line_size, 1, sizeof(hashTable));
+    piq_ht * head = (piq_ht *)myacalloc(L1_CACHE_LINE_SIZE, 1, sizeof(piq_ht));
 
-    head->tableArray =
-        (subTable **)myacalloc(cache_line_size, max_tables, sizeof(subTable *));
+    head->tableArray = (piq_subtable_t **)myacalloc(L1_CACHE_LINE_SIZE,
+                                                    max_tables,
+                                                    sizeof(piq_subtable_t *));
 
-    head->tableArray[0] = createST(head, DEFAULT_INIT_TSIZE);
+    head->tableArray[0] = createST(head, PIQ_DEFAULT_INIT_TSIZE);
     head->end           = 1;
     head->start         = 0;
 
-    for (uint32_t i = 0; i < DEFAULT_HASH_ATTEMPTS; i++) {
+    for (uint32_t i = 0; i < PIQ_DEFAULT_HASH_ATTEMPTS; i++) {
         uint32_t rand_var = rand();
-        memcpy((void *)(((uint64_t)head) + offsetof(hashTable, seeds) +
+        memcpy((void *)(((uint64_t)head) + offsetof(piq_ht, seeds) +
                         (i * sizeof(uint32_t))),
                &rand_var,
                sizeof(rand_var));
@@ -815,16 +816,16 @@ initTable() {
 
 
 void
-freeTable(hashTable * head, void (*freeEnt)(void *)) {
+piq_free_table(piq_ht * head, void (*free_ent)(void *)) {
 
     uint32_t count = 0;
     for (uint32_t i = 0; i < head->end; i++) {
-        subTable * ht = head->tableArray[i];
+        piq_subtable_t * ht = head->tableArray[i];
         for (uint32_t j = 0; j < ht->tableSize; j++) {
             if (getNodePtr(ht->innerTable[j]) != NULL) {
                 if (!getCopy(ht->innerTable[j])) {
                     count++;
-                    freeEnt((void *)getVal(ht->innerTable[j]));
+                    free_ent((void *)getVal(ht->innerTable[j]));
 
                     free(getNodePtr(ht->innerTable[j]));
                 }

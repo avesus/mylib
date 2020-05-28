@@ -1,5 +1,4 @@
 #include "driver.h"
-#include <datastruct/fht_hashmap.hpp>
 
 int32_t verbose = 0;
 int32_t rseed   = 0;
@@ -24,7 +23,7 @@ main(int argc, char ** argv) {
     srand(rseed);
     srandom(rseed);
 
-    INIT_DEBUGGER;
+    FDBG_INIT_DEBUGGER;
 
     ArgParser * ap = createArgumentParser(&argp);
     if (parseArguments(ap, argc, argv)) {
@@ -34,7 +33,8 @@ main(int argc, char ** argv) {
     freeArgumentParser(ap);
 
     // code goes here
-
-    FREE_DEBUGGER;
+    FDBG_NEW_FRAME(FDBG_FMTS("%d", "%d"), FDBG_VARS(verbose, rseed));
+    FDBG_PRINT_FRAMES;
+    FDBG_FREE_DEBUGGER;
     return 0;
 }
