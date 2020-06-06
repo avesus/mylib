@@ -73,7 +73,7 @@ struct _fht_empty_t {};
 
 // max memory willing to use (this doesn't really have effect with default
 // allocator)
-const uint32_t FHT_MAX_MEMORY = (1 << 30);
+const uint64_t FHT_MAX_MEMORY = ((1UL) << 30);
 
 // default init size (since mmap is backend for allocation less than page size
 // has no effect)
@@ -187,13 +187,13 @@ struct fht_chunk {
                                   const T,
                                   T const &>::type;
 
-        // determine node type based on K/V
-        template<typename _K = K, typename _V = V>
-        using local_node_t =
-            typename std::conditional<(FHT_NOT_SPECIAL(FHT_SPECIAL_TYPES) &&
-                                       sizeof(_K) <= FHT_SEPERATE_THRESH),
-                                      fht_seperate_kv<_K, _V>,
-                                      fht_combined_kv<_K, _V>>::type;
+    // determine node type based on K/V
+    template<typename _K = K, typename _V = V>
+    using local_node_t =
+        typename std::conditional<(FHT_NOT_SPECIAL(FHT_SPECIAL_TYPES) &&
+                                   sizeof(_K) <= FHT_SEPERATE_THRESH),
+                                  fht_seperate_kv<_K, _V>,
+                                  fht_combined_kv<_K, _V>>::type;
 
 
     // typedefs to fht_table can access these variables
