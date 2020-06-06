@@ -74,4 +74,12 @@ extern int32_t verbose;
 
 #define INT32_MASK 0xffffffff
 
+#define VM_ADDRESS_BITS 48
+#define MALLOC_ALIGNMENT_BITS 4
+
+#define VM_ADDRESS_MASK (((1UL) << VM_ADDRESS_BITS) - 1)
+#define MALLOC_ALIGNMENT_MASK (((1UL) << MALLOC_ALIGNMENT_BITS) - 1)
+
+
+
 #endif

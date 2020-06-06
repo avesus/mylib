@@ -33,8 +33,7 @@ main(int argc, char ** argv) {
     freeArgumentParser(ap);
 
     // code goes here
-    FDBG_NEW_FRAME(FDBG_FMTS("%d", "%d"), FDBG_VARS(verbose, rseed));
-    FDBG_PRINT_FRAMES;
+
     FDBG_FREE_DEBUGGER;
     return 0;
 }

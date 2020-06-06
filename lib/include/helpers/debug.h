@@ -99,12 +99,6 @@ typedef struct frame_data {
 // important in some cases)
 #define FDBG_ALIGN(X) (FDBG_ALIGNMENT - ((X) & (FDBG_ALIGNMENT_MASK)));
 
-// for getting block size from
-#define FDBG_MALLOC_SIZE_MASK (~(15UL))
-#define FDBG_BLOCK_SIZE(X)                                                     \
-    (((*(((uint64_t *)X) - 1)) & FDBG_MALLOC_SIZE_MASK) -                      \
-     (2 * sizeof(uint64_t)))
-
 // copy strings helper
 #define FDBG_VAR_COPY_STR(X, ...) APPLY_X(FDBG_TO_COPY_STR, X, __VA_ARGS__)
 
@@ -166,21 +160,21 @@ typedef struct frame_data {
 // reused buffers already allocated for the symbol frame to be over
 // written. The pro is it will be faster the con is it requires some
 // locking for parallelism. Best thing to do would be rewrite malloc.
-#define FDBG_NARGS       COMBINE(restricted_do_not_use_nargs, ln)
-#define FDBG_FMT_LEN     COMBINE(restricted_do_not_use_fmt_len, ln)
-#define FDBG_NAME_LEN    COMBINE(restricted_do_not_use_name_len, ln)
-#define FDBG_VAR_LEN     COMBINE(restricted_do_not_use_var_len, ln)
-#define FDBG_FILE_LEN    COMBINE(restricted_do_not_use_file_len, ln)
-#define FDBG_FUN_LEN     COMBINE(restricted_do_not_use_fun_len, ln)
-#define FDBG_SIZE_LEN    COMBINE(restricted_do_not_use_size_len, ln)
-#define FDBG_SIZE_ALIGN  COMBINE(restricted_do_not_use_size_align_len, ln)
-#define FDBG_DATA_ALIGN  COMBINE(restricted_do_not_use_data_align_len, ln)
-#define FDBG_TOTAL_SIZE  COMBINE(restricted_do_not_use_total_size, ln)
-#define FDBG_STRUCT_PTR  COMBINE(restricted_do_not_use_struct_ptr, ln)
-#define FDBG_BUF_PTR     COMBINE(restricted_do_not_use_buf_ptr, ln)
-#define FDBG_ID_NODE     COMBINE(restricted_do_not_use_id_node, ln)
-#define FDBG_ID_STRUCT   COMBINE(restricted_do_not_use_id_struct, ln)
-#define FDBG_FRAME_INDEX COMBINE(restricted_do_not_use_frame_index, ln)
+#define FDBG_NARGS       MACRO_COMBINE(restricted_do_not_use_nargs, ln)
+#define FDBG_FMT_LEN     MACRO_COMBINE(restricted_do_not_use_fmt_len, ln)
+#define FDBG_NAME_LEN    MACRO_COMBINE(restricted_do_not_use_name_len, ln)
+#define FDBG_VAR_LEN     MACRO_COMBINE(restricted_do_not_use_var_len, ln)
+#define FDBG_FILE_LEN    MACRO_COMBINE(restricted_do_not_use_file_len, ln)
+#define FDBG_FUN_LEN     MACRO_COMBINE(restricted_do_not_use_fun_len, ln)
+#define FDBG_SIZE_LEN    MACRO_COMBINE(restricted_do_not_use_size_len, ln)
+#define FDBG_SIZE_ALIGN  MACRO_COMBINE(restricted_do_not_use_size_align_len, ln)
+#define FDBG_DATA_ALIGN  MACRO_COMBINE(restricted_do_not_use_data_align_len, ln)
+#define FDBG_TOTAL_SIZE  MACRO_COMBINE(restricted_do_not_use_total_size, ln)
+#define FDBG_STRUCT_PTR  MACRO_COMBINE(restricted_do_not_use_struct_ptr, ln)
+#define FDBG_BUF_PTR     MACRO_COMBINE(restricted_do_not_use_buf_ptr, ln)
+#define FDBG_ID_NODE     MACRO_COMBINE(restricted_do_not_use_id_node, ln)
+#define FDBG_ID_STRUCT   MACRO_COMBINE(restricted_do_not_use_id_struct, ln)
+#define FDBG_FRAME_INDEX MACRO_COMBINE(restricted_do_not_use_frame_index, ln)
 
 //////////////////////////////////////////////////////////////////////
 // macros that are actually part of API
@@ -238,7 +232,7 @@ typedef struct frame_data {
                 IDN);                                                          \
                                                                                \
             if (FDBG_ID_STRUCT[FDBG_FRAME_INDEX] && 0 &&                       \
-                (FDBG_BLOCK_SIZE(FDBG_ID_STRUCT[FDBG_FRAME_INDEX]) >=          \
+                (GET_MALLOC_BLOCK_LENGTH(FDBG_ID_STRUCT[FDBG_FRAME_INDEX]) >=          \
                  FDBG_TOTAL_SIZE)) {                                           \
                 FDBG_BUF_PTR = (uint8_t *)FDBG_ID_STRUCT[FDBG_FRAME_INDEX];    \
             }                                                                  \

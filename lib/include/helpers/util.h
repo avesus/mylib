@@ -36,7 +36,7 @@ extern const char * progname;
 #define DBG_ASSERT(X, msg, args...)                                            \
     {                                                                          \
         if (__builtin_expect((!(X)), 0)) {                                     \
-            errdie(msg, ##args);                                               \
+            die(msg, ##args);                                               \
         }                                                                      \
     }
 
@@ -315,10 +315,10 @@ typedef union eight_byte_cast {
 
 
 // For generating macros
-#define COMBINE_(X, Y) X##Y
-#define COMBINE(X, Y)  COMBINE_(X, Y)
+#define MACRO_COMBINE_(X, Y) X##Y
+#define MACRO_COMBINE(X, Y)  MACRO_COMBINE_(X, Y)
 
-#define COMBINE_3(X, Y, Z) X##Y##Z
-#define COMBINE3(X, Y, Z)  COMBINE_3(X, Y, Z)
+#define MACRO_COMBINE_3(X, Y, Z) X##Y##Z
+#define MACRO_COMBINE3(X, Y, Z)  MACRO_COMBINE_3(X, Y, Z)
 
 #endif

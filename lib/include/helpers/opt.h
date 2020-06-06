@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <x86intrin.h>
 
-#define MIN(x, y) (((x) < (y) ? (x) : (y)))
-#define MAX(x, y) (((x) > (y) ? (x) : (y)))
-#define ROUNDUP_P2(X, Y) (((X) + ((Y) - 1)) & (~((Y) - 1)))
+#define MIN(x, y)        (((x) < (y) ? (x) : (y)))
+#define MAX(x, y)        (((x) > (y) ? (x) : (y)))
+#define ROUNDUP_P2(X, Y) (((X) + ((Y)-1)) & (~((Y)-1)))
 
 /*
   X	x index returned from IDX_TO_X
@@ -27,7 +27,7 @@
   Z	x index returned from IDX_TO_X
   Y	log_2(init_size)
 */
-#define IDX_TO_Y(X, Y, Z) ((X) & ((1 << ((Y) + ((Z) - 1) + ((Y) == 0))) - 1))
+#define IDX_TO_Y(X, Y, Z) ((X) & ((1 << ((Y) + ((Z)-1) + ((Y) == 0))) - 1))
 
 // ff -> find first, i.e ff1 of 0b10101000 would return 3
 #define ff1_32_ctz(X) ((X) ? __builtin_ctz((X)) : 32)
@@ -94,14 +94,94 @@
 #define ff1_64_ffs(X) __builtin_ffsll((X))
 #define ff0_64_ffs(X) ff1_64_ffs(~(X))
 
-uint32_t ulog2_32(uint32_t n);
-uint32_t ulog2_64(uint64_t n);
+inline uint32_t
+ulog2_32(uint32_t n) {
+    uint32_t s, t;
+    t = (n > 0xffff) << 4;
+    n >>= t;
+    s = (n > 0xff) << 3;
+    n >>= s, t |= s;
+    s = (n > 0xf) << 2;
+    n >>= s, t |= s;
+    s = (n > 0x3) << 1;
+    n >>= s, t |= s;
+    return (t | (n >> 1));
+}
+
+inline uint32_t
+ulog2_64(uint64_t n) {
+    uint64_t s, t;
+    t = (n > 0xffffffff) << 5;
+    n >>= t;
+    t = (n > 0xffff) << 4;
+    n >>= t;
+    s = (n > 0xff) << 3;
+    n >>= s, t |= s;
+    s = (n > 0xf) << 2;
+    n >>= s, t |= s;
+    s = (n > 0x3) << 1;
+    n >>= s, t |= s;
+    return (t | (n >> 1));
+}
+
 
 // these get optimized to popcnt
-uint32_t bitcount_32(uint32_t v);
-uint32_t bitcount_64(uint64_t v);
+inline uint32_t
+bitcount_32(uint32_t v) {
+    uint32_t c;
+    c = v - ((v >> 1) & 0x55555555);
+    c = ((c >> 2) & 0x33333333) + (c & 0x33333333);
+    c = ((c >> 4) + c) & 0x0F0F0F0F;
+    c = ((c >> 8) + c) & 0x00FF00FF;
+    c = ((c >> 16) + c) & 0x0000FFFF;
+    return c;
+}
 
-uint32_t roundup_32(uint32_t v);
-uint64_t roundup_64(uint64_t v);
+inline uint32_t
+bitcount_64(uint64_t v) {
+    uint64_t c;
+    c = v - ((v >> 1) & 0x5555555555555555UL);
+    c = ((c >> 2) & 0x3333333333333333UL) + (c & 0x3333333333333333UL);
+    c = ((c >> 4) + c) & 0x0F0F0F0F0F0F0F0FUL;
+    c = ((c >> 8) + c) & 0x00FF00FF00FF00FFUL;
+    c = ((c >> 16) + c) & 0x0000FFFF0000FFFFUL;
+    c = ((c >> 32) + c) & 0x00000000FFFFFFFFUL;
+    return c;
+}
+
+inline uint32_t
+next_p2_32(uint32_t v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
+inline uint64_t
+next_p2_64(uint64_t v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    v++;
+    return v;
+}
+
+#define GET_MALLOC_BLOCK_LENGTH(X)                                             \
+    (((uint64_t)(X))                                                           \
+         ? (((*(((uint64_t *)X) - 1)) & (~MALLOC_ALIGNMENT_MASK)) -           \
+            (2 * sizeof(uint64_t)))                                            \
+         : 0)
+
+#define TO_MASK_64(X) (((1UL) << (X)) - 1)
+#define TO_MASK_32(X) (((1) << (X)) - 1)
+
 
 #endif

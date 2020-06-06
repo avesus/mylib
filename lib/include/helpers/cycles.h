@@ -52,8 +52,13 @@ void tsc_printTracker(tsc_tracker  tracker,
                       FILE *       outfile,
                       const char * header);
 
-// get current cycle count
-uint64_t grabTSC();
+// just a wrapper for getting time with rdtsc
+inline uint64_t
+grabTSC() {
+    uint32_t hi, lo;
+    __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
+    return (((uint64_t)lo) | (((uint64_t)hi) << 32));
+}
 
 // adds new time to tracker
 void tsc_takeTime(tsc_tracker * tracker);

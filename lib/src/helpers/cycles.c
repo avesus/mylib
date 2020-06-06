@@ -124,15 +124,6 @@ tsc_endTrial(tsc_tracker * tracker) {
 }
 
 
-// just a wrapper for getting time with rdtsc
-uint64_t
-grabTSC() {
-    unsigned hi, lo;
-    __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
-    return (((uint64_t)lo) | (((uint64_t)hi) << 32));
-}
-
-
 // store a tsc value provided
 void
 tsc_storeTime(uint64_t t, tsc_tracker * tracker) {
