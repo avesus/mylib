@@ -78,7 +78,7 @@ class small_string {
     }
 
     ~small_string() {
-        this->free_str();
+        // really dislike destructors
     }
 
     void

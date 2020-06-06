@@ -182,17 +182,18 @@ struct fht_chunk {
     // values machine word size is ill advised
     template<typename T>
     using pass_type_t =
-        typename std::conditional<(sizeof(T) <= FHT_PASS_BY_VAL_THRESH),
+        typename std::conditional<(std::is_arithmetic<T>::value ||
+                                   std::is_pointer<T>::value),
                                   const T,
                                   T const &>::type;
 
-    // determine node type based on K/V
-    template<typename _K = K, typename _V = V>
-    using local_node_t =
-        typename std::conditional<(FHT_NOT_SPECIAL(FHT_SPECIAL_TYPES) &&
-                                   sizeof(_K) <= FHT_SEPERATE_THRESH),
-                                  fht_seperate_kv<_K, _V>,
-                                  fht_combined_kv<_K, _V>>::type;
+        // determine node type based on K/V
+        template<typename _K = K, typename _V = V>
+        using local_node_t =
+            typename std::conditional<(FHT_NOT_SPECIAL(FHT_SPECIAL_TYPES) &&
+                                       sizeof(_K) <= FHT_SEPERATE_THRESH),
+                                      fht_seperate_kv<_K, _V>,
+                                      fht_combined_kv<_K, _V>>::type;
 
 
     // typedefs to fht_table can access these variables
@@ -388,11 +389,6 @@ class fht_table {
         fht_chunk<_K, _V> * const>::type
     resize();
 
-    template<typename T>
-    using pass_type_t =
-        typename std::conditional<(sizeof(T) <= FHT_PASS_BY_VAL_THRESH),
-                                  const T,
-                                  T const &>::type;
 
     using key_pass_t = typename fht_chunk<K, V>::key_pass_t;
     using val_pass_t = typename fht_chunk<K, V>::val_pass_t;

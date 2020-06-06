@@ -1,4 +1,5 @@
 #include "driver.h"
+#include <datastruct/fht_ht.hpp>
 
 int32_t verbose = 0;
 int32_t rseed   = 0;
